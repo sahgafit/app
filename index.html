@@ -210,6 +210,17 @@ nav button.add .ic{
 }
 nav button.add.on .ic{background:var(--ouro-claro)}
 
+/* ---------- botões do menu de lançamento ---------- */
+.opt{
+  display:flex;align-items:center;gap:13px;width:100%;text-align:left;margin-bottom:10px;
+  background:var(--carvao);border:1px solid var(--linha);border-radius:var(--r);
+  padding:14px;color:var(--texto);cursor:pointer;font-size:15px
+}
+.opt:active{background:var(--grafite)}
+.opt-ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:17px;flex:0 0 auto}
+.opt b{display:block;font-size:14.5px;font-weight:600;margin-bottom:2px}
+.opt small{display:block;font-size:11.5px;color:var(--texto2);line-height:1.35}
+
 .vazio{text-align:center;padding:46px 20px;color:var(--texto2)}
 .vazio .em{font-size:32px;margin-bottom:10px;opacity:.5}
 .toast{
@@ -248,10 +259,21 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <div class="card kpi"><div class="lab">Valor do estoque</div><div class="val" id="k-valor">R$ 0</div><div class="sub">a preço de venda</div></div>
     </div>
 
-    <div class="sec"><h2>Recuperação do aporte</h2></div>
+    <div class="sec"><h2>Caixa</h2><button class="lnk" onclick="ir('novo')">+ lançar</button></div>
     <div class="card">
-      <div class="lin"><span>Aporte total investido</span><b id="k-aporte">R$ 0</b></div>
-      <div class="lin"><span>Já recuperado em caixa</span><b class="v-ouro" id="k-recup">R$ 0</b></div>
+      <div class="lin"><span>(+) Aportes de capital</span><b class="v-verde" id="k-c-aporte">R$ 0</b></div>
+      <div class="lin"><span>(+) Vendas recebidas</span><b class="v-verde" id="k-c-vendas">R$ 0</b></div>
+      <div class="lin"><span>(−) Compra de peças</span><b id="k-c-pecas">R$ 0</b></div>
+      <div class="lin"><span>(−) Compra de material</span><b id="k-c-mat">R$ 0</b></div>
+      <div class="lin"><span>(−) Despesas</span><b id="k-c-desp">R$ 0</b></div>
+      <div class="lin"><span>(−) Retirada da cunhada</span><b id="k-c-ret">R$ 0</b></div>
+      <div class="lin tot"><span>Saldo em caixa</span><b id="k-c-saldo">R$ 0</b></div>
+    </div>
+
+    <div class="sec"><h2>Recuperação do investimento</h2></div>
+    <div class="card">
+      <div class="lin"><span>Já investido (peças + material + despesas)</span><b id="k-aporte">R$ 0</b></div>
+      <div class="lin"><span>Já voltou em caixa</span><b class="v-ouro" id="k-recup">R$ 0</b></div>
       <div class="bar"><i id="k-bar" style="width:0%"></i></div>
       <div class="lin" style="margin-top:9px"><span>Faltam vender</span><b id="k-faltam">— peças</b></div>
       <div class="lin"><span>Caixa que entra por peça</span><b id="k-porpeca">R$ 0</b></div>
@@ -286,9 +308,96 @@ nav button.add.on .ic{background:var(--ouro-claro)}
     <div id="lista-estoque"></div>
   </div>
 
-  <!-- ============ CADASTRO ============ -->
+  <!-- ============ LANÇAMENTOS ============ -->
   <div class="page hide" id="pg-novo">
-    <div class="sec"><h2>Cadastrar peça</h2></div>
+
+    <!-- menu -->
+    <div id="nv-menu">
+      <div class="sec"><h2>O que você quer lançar?</h2></div>
+      <button class="opt" onclick="abrirForm('peca')">
+        <span class="opt-ic" style="background:rgba(201,162,39,.15);color:#E8CF7E">&#9636;</span>
+        <span><b>Peça nova</b><small>Entra no estoque e sai do caixa</small></span></button>
+      <button class="opt" onclick="abrirForm('material')">
+        <span class="opt-ic" style="background:rgba(96,165,250,.14);color:#60A5FA">&#9873;</span>
+        <span><b>Compra de material</b><small>Etiquetas, sacolas, adesivos — por quantidade e valor total</small></span></button>
+      <button class="opt" onclick="abrirForm('despesa')">
+        <span class="opt-ic" style="background:rgba(248,113,113,.14);color:#F87171">&#8599;</span>
+        <span><b>Despesa</b><small>Frete, anúncio, transporte, qualquer outro gasto</small></span></button>
+      <button class="opt" onclick="abrirForm('aporte')">
+        <span class="opt-ic" style="background:rgba(74,222,128,.14);color:#4ADE80">&#8600;</span>
+        <span><b>Aporte de capital</b><small>Dinheiro que você coloca no negócio</small></span></button>
+    </div>
+
+    <!-- material -->
+    <div id="nv-material" class="hide">
+      <div class="sec"><h2>Compra de material</h2><button class="lnk" onclick="voltarMenu()">voltar</button></div>
+      <div class="card">
+        <div class="f"><label>Tipo de material *</label><select id="mt-tipo" onchange="previewMaterial()">
+          <option>Etiqueta / tag</option><option>Sacola</option><option>Adesivo / lacre</option>
+          <option>Cartão de agradecimento</option><option>Outro</option></select></div>
+        <div class="f" id="mt-outro-box" style="display:none"><label>Qual?</label>
+          <input id="mt-outro" placeholder="Ex.: papel de seda" oninput="previewMaterial()"></div>
+        <div class="frow">
+          <div class="f"><label>Quantidade comprada *</label>
+            <input id="mt-qtd" type="number" inputmode="numeric" step="1" placeholder="500" oninput="previewMaterial()"></div>
+          <div class="f"><label>Valor total pago (R$) *</label>
+            <input id="mt-valor" type="number" inputmode="decimal" step="0.01" placeholder="80,00" oninput="previewMaterial()"></div>
+        </div>
+        <div class="frow">
+          <div class="f"><label>Data</label><input type="date" id="mt-data"></div>
+          <div class="f"><label>Onde comprou</label><input id="mt-forn" placeholder="opcional"></div>
+        </div>
+        <div class="resumo" id="mt-resumo"></div>
+        <button class="btn pri full" onclick="salvarMaterial()">Registrar compra</button>
+      </div>
+      <div class="aviso">O custo por unidade é calculado sozinho e entra no preço de venda das peças.
+        O valor total sai do caixa na data informada.</div>
+      <div class="sec"><h2>Compras registradas</h2></div>
+      <div class="card" id="mt-lista"></div>
+    </div>
+
+    <!-- despesa -->
+    <div id="nv-despesa" class="hide">
+      <div class="sec"><h2>Despesa</h2><button class="lnk" onclick="voltarMenu()">voltar</button></div>
+      <div class="card">
+        <div class="f"><label>Descrição *</label><input id="dp-desc" placeholder="Ex.: frete do lote 41644"></div>
+        <div class="f"><label>Categoria</label><select id="dp-cat">
+          <option>Frete / transporte</option><option>Divulgação / anúncio</option><option>Embalagem avulsa</option>
+          <option>Taxas e tarifas</option><option>Outros</option></select></div>
+        <div class="frow">
+          <div class="f"><label>Valor (R$) *</label><input id="dp-valor" type="number" inputmode="decimal" step="0.01" placeholder="0,00"></div>
+          <div class="f"><label>Data</label><input type="date" id="dp-data"></div>
+        </div>
+        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13.5px;padding:4px 2px 12px">
+          <input type="checkbox" id="dp-rateia" style="width:18px;height:18px;accent-color:#C9A227;flex:0 0 auto;margin-top:1px">
+          <span>Ratear no custo das peças<br>
+            <small style="color:var(--texto2);font-size:11.5px">Marque para frete da mercadoria. O valor é dividido pelas peças compradas e entra no preço de venda.</small></span></label>
+        <button class="btn pri full" onclick="salvarDespesa()">Registrar despesa</button>
+      </div>
+      <div class="aviso">Toda despesa sai do caixa. Só entra no preço de venda se você marcar o rateio.</div>
+      <div class="sec"><h2>Despesas registradas</h2></div>
+      <div class="card" id="dp-lista"></div>
+    </div>
+
+    <!-- aporte -->
+    <div id="nv-aporte" class="hide">
+      <div class="sec"><h2>Aporte de capital</h2><button class="lnk" onclick="voltarMenu()">voltar</button></div>
+      <div class="card">
+        <div class="f"><label>Descrição</label><input id="ap-desc" placeholder="Ex.: capital para o lote de outubro"></div>
+        <div class="frow">
+          <div class="f"><label>Valor (R$) *</label><input id="ap-valor" type="number" inputmode="decimal" step="0.01" placeholder="0,00"></div>
+          <div class="f"><label>Data</label><input type="date" id="ap-data"></div>
+        </div>
+        <button class="btn pri full" onclick="salvarAporte()">Registrar aporte</button>
+      </div>
+      <div class="aviso">Dinheiro que entra no negócio. É sobre esse total que o payback é calculado.</div>
+      <div class="sec"><h2>Aportes registrados</h2></div>
+      <div class="card" id="ap-lista"></div>
+    </div>
+
+    <!-- peça -->
+    <div id="nv-peca" class="hide">
+    <div class="sec"><h2>Cadastrar peça</h2><button class="lnk" onclick="voltarMenu()">voltar</button></div>
     <div class="card">
       <div class="f"><label>Nome da peça *</label><input id="n-nome" placeholder="Ex.: Conj. Short Luana"></div>
       <div class="frow">
@@ -311,7 +420,8 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <div class="resumo" id="n-resumo"></div>
       <button class="btn pri full" onclick="salvarPeca()">Cadastrar no estoque</button>
     </div>
-    <div class="aviso">A peça entra como <b>ENTRADA</b> e o valor pago é somado ao aporte automaticamente.</div>
+    <div class="aviso">A peça entra no estoque e o valor pago sai do caixa.</div>
+    </div>
   </div>
 
   <!-- ============ MOVIMENTOS ============ -->
@@ -322,19 +432,14 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 
   <!-- ============ CONFIG ============ -->
   <div class="page hide" id="pg-config">
-    <div class="sec"><h2>Material de embalagem (por peça)</h2></div>
+    <div class="sec"><h2>Material de embalagem</h2>
+      <button class="lnk" onclick="ir('novo');abrirForm('material')">registrar compra</button></div>
     <div class="card">
-      <div class="frow">
-        <div class="f"><label>Tag / etiqueta</label><input type="number" step="0.01" inputmode="decimal" id="c-tag" oninput="salvarConfig()"></div>
-        <div class="f"><label>Sacola</label><input type="number" step="0.01" inputmode="decimal" id="c-sacola" oninput="salvarConfig()"></div>
-      </div>
-      <div class="frow">
-        <div class="f"><label>Adesivo / lacre</label><input type="number" step="0.01" inputmode="decimal" id="c-adesivo" oninput="salvarConfig()"></div>
-        <div class="f"><label>Cartão / brinde</label><input type="number" step="0.01" inputmode="decimal" id="c-cartaog" oninput="salvarConfig()"></div>
-      </div>
-      <div class="f"><label>Outros</label><input type="number" step="0.01" inputmode="decimal" id="c-outros" oninput="salvarConfig()"></div>
-      <div class="lin tot"><span>Total por peça</span><b id="c-mat-total">R$ 0,00</b></div>
-      <div class="dica" style="margin-top:6px;font-size:11px;color:var(--texto2)">Entra no custo <b>antes</b> do multiplicador — o preço de venda sobe sozinho.</div>
+      <div id="c-mat-resumo"></div>
+      <div class="lin tot"><span>Material por peça</span><b id="c-mat-total">R$ 0,00</b></div>
+      <div class="dica" style="margin-top:8px;font-size:11.5px;color:var(--texto2)">
+        Calculado a partir das suas compras: valor pago dividido pela quantidade, por tipo.
+        Entra no custo <b>antes</b> do multiplicador, então o preço de venda se ajusta sozinho.</div>
     </div>
 
     <div class="sec"><h2>Multiplicador por categoria</h2></div>
@@ -370,7 +475,6 @@ nav button.add.on .ic{background:var(--ouro-claro)}
         <div class="f"><label>Samuel (%)</label><input type="number" step="1" inputmode="numeric" id="c-sam" oninput="salvarConfig()"></div>
         <div class="f"><label>Cunhada (%)</label><input type="number" step="1" inputmode="numeric" id="c-cun" oninput="salvarConfig()"></div>
       </div>
-      <div class="f"><label>Frete total dos lotes (R$)</label><input type="number" step="0.01" inputmode="decimal" id="c-frete" oninput="salvarConfig()"></div>
       <div class="f"><label>Mínimo de vendas no mês p/ liberar permuta</label><input type="number" step="1" inputmode="numeric" id="c-permmin" oninput="salvarConfig()"></div>
     </div>
 
@@ -492,7 +596,7 @@ const SEED=[
  ['69359','Macaquinho Yasmin','Macaquinho','M','Preto',80,'41644','2026-09-23']
 ];
 
-let S={cfg:JSON.parse(JSON.stringify(CFG_PADRAO)),pecas:[],movs:[]};
+let S={cfg:JSON.parse(JSON.stringify(CFG_PADRAO)),pecas:[],movs:[],materiais:[],despesas:[],aportes:[]};
 let tela='painel', filtroCat='Todas', filtroMov='Tudo';
 let ctxSaida=null;
 
@@ -512,6 +616,7 @@ function carregar(){
       if(!S.cfg.gdClientId)S.cfg.gdClientId=CFG_PADRAO.gdClientId;   /* salvo antes do ID existir */
       if(!S.cfg.gdArquivo)S.cfg.gdArquivo=CFG_PADRAO.gdArquivo;
       S.pecas=d.pecas||[]; S.movs=d.movs||[];
+      S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
       return;
     }
   }catch(e){}
@@ -523,8 +628,14 @@ function salvar(){
   if(typeof gdAgendar==='function')gdAgendar();      /* cópia no Drive, se ligada */
 }
 
+/* um aporte por lote, igual ao que foi pago em cada pedido */
+function aportesDosLotes(){
+  return [{id:'a1',data:'2026-08-14',desc:'Capital do pedido 39532',valor:1001},
+          {id:'a2',data:'2026-09-23',desc:'Capital do pedido 41644',valor:835}];
+}
+
 function semear(){
-  S.pecas=[]; S.movs=[];
+  S.pecas=[]; S.movs=[]; S.materiais=[]; S.despesas=[]; S.aportes=aportesDosLotes();
   SEED.forEach((x,i)=>{
     const id='p'+(i+1);
     S.pecas.push({id:id,cod:x[0],nome:x[1],cat:x[2],tam:x[3],cor:x[4],custo:x[5],extra:0,lote:x[6],precoManual:null,criado:x[7]});
@@ -543,10 +654,31 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 /* ---------------- motor de cálculo ---------------- */
-function matUnit(){const m=S.cfg.material;return (+m.tag||0)+(+m.sacola||0)+(+m.adesivo||0)+(+m.cartaog||0)+(+m.outros||0);}
+/* Custo de material por peça: derivado das compras registradas.
+   Para cada tipo, custo unitário = tudo que gastou ÷ tudo que comprou (média ponderada).
+   A soma dos tipos é o que cada peça leva de embalagem. */
+function matPorTipo(){
+  const r={};
+  (S.materiais||[]).forEach(m=>{
+    const t=m.tipo||'Outro';
+    if(!r[t])r[t]={qtd:0,valor:0};
+    r[t].qtd+=(+m.qtd||0); r[t].valor+=(+m.valor||0);
+  });
+  Object.keys(r).forEach(t=>{ r[t].unit=r[t].qtd>0?r[t].valor/r[t].qtd:0; });
+  return r;
+}
+function matUnit(){
+  const r=matPorTipo();
+  return Object.keys(r).reduce((a,t)=>a+r[t].unit,0);
+}
+const somaMateriais=()=>(S.materiais||[]).reduce((a,m)=>a+(+m.valor||0),0);
+const somaDespesas =()=>(S.despesas ||[]).reduce((a,d)=>a+(+d.valor||0),0);
+const somaAportes  =()=>(S.aportes  ||[]).reduce((a,p)=>a+(+p.valor||0),0);
+/* despesas marcadas para rateio (frete da mercadoria) divididas pelas peças compradas */
 function freteUnit(){
   const q=S.movs.filter(m=>m.tipo==='ENTRADA').reduce((a,m)=>a+m.qtd,0);
-  return q>0?(+S.cfg.frete||0)/q:0;
+  const total=(S.despesas||[]).filter(d=>d.rateia).reduce((a,d)=>a+(+d.valor||0),0)+(+S.cfg.frete||0);
+  return q>0?total/q:0;
 }
 function multDe(cat){ return S.cfg.mult[cat]!=null?+S.cfg.mult[cat]:1.90; }
 
@@ -607,9 +739,11 @@ function totais(){
     else if(m.tipo==='PERMUTA'){permutadas+=m.qtd; lucro-=c.total*m.qtd;}
     else if(m.tipo==='PERDA'){perdidas+=m.qtd; lucro-=c.aquis*m.qtd;}
   });
-  const aporte=aporteMerc+compradas*mat+(+S.cfg.frete||0);
+  const aporte=somaAportes();
+  const gastoMat=somaMateriais(), gastoDesp=somaDespesas();
   const sam=lucro*((+S.cfg.splitSam||0)/100), cun=lucro*((+S.cfg.splitCun||0)/100);
-  const caixa=caixaVendas-Math.max(0,cun);
+  /* caixa de verdade: tudo que entrou menos tudo que saiu */
+  const caixa=aporte+caixaVendas-aporteMerc-gastoMat-gastoDesp-Math.max(0,cun);
   let estQ=0,estCusto=0,estVenda=0,potLucro=0;
   S.pecas.forEach(p=>{
     const q=estoqueDe(p.id); if(q<=0)return;
@@ -620,9 +754,11 @@ function totais(){
   const porPeca=Math.max(0.01,precoMedio-lucroMedio*((+S.cfg.splitCun||0)/100));
   let permCusto=0;
   S.movs.filter(m=>m.tipo==='PERMUTA').forEach(m=>{const p=peca(m.pecaId);if(p)permCusto+=calc(p).total*m.qtd;});
+  const investido=aporteMerc+gastoMat+gastoDesp;   /* o que já foi aplicado no negócio */
   return {compradas,vendidas,permutadas,perdidas,aporte,receita,lucro,sam,cun,caixa,
           estQ,estCusto,estVenda,potLucro,precoMedio,lucroMedio,porPeca,permCusto,
-          faltam:Math.max(0,Math.ceil(aporte/porPeca)-vendidas)};
+          gastoMat,gastoDesp,gastoPecas:aporteMerc,investido,matUnit:mat,
+          faltam:Math.max(0,Math.ceil(investido/porPeca)-vendidas)};
 }
 
 /* ---------------- navegação ---------------- */
@@ -637,7 +773,7 @@ function ir(t){
   if(t==='estoque')renderEstoque();
   if(t==='movs')renderMovs();
   if(t==='config')renderConfig();
-  if(t==='novo')prepararCadastro();
+  if(t==='novo')abrirForm('menu');
 }
 
 /* ---------------- painel ---------------- */
@@ -647,8 +783,13 @@ function renderPainel(){
   g('k-estoque',T.estQ); g('k-estoque-sub',T.compradas+' peças compradas · '+T.vendidas+' vendidas');
   g('k-caixa',R0(T.caixa)); g('k-lucro',R0(T.lucro)); g('k-lucro-sub',T.vendidas+' venda(s) registrada(s)');
   g('k-valor',R0(T.estVenda));
-  g('k-aporte',R$(T.aporte)); g('k-recup',R$(T.caixa));
-  const pct=T.aporte>0?Math.min(100,T.caixa/T.aporte*100):0;
+  g('k-c-aporte','+ '+R$(T.aporte)); g('k-c-vendas','+ '+R$(T.receita));
+  g('k-c-pecas','− '+R$(T.gastoPecas)); g('k-c-mat','− '+R$(T.gastoMat));
+  g('k-c-desp','− '+R$(T.gastoDesp)); g('k-c-ret','− '+R$(Math.max(0,T.cun)));
+  g('k-c-saldo',R$(T.caixa));
+  document.getElementById('k-c-saldo').className=T.caixa<0?'v-verm':'';
+  g('k-aporte',R$(T.investido)); g('k-recup',R$(T.caixa));
+  const pct=T.investido>0?Math.min(100,Math.max(0,T.caixa/T.investido*100)):0;
   document.getElementById('k-bar').style.width=pct.toFixed(1)+'%';
   g('k-faltam',T.faltam+' peça'+(T.faltam===1?'':'s'));
   g('k-porpeca',R$(T.porPeca));
@@ -852,7 +993,132 @@ function editarPeca(pid){
   toast('Editando — salve para atualizar');
 }
 
-/* ---------------- cadastro ---------------- */
+/* =====================================================================
+   LANÇAMENTOS — material, despesa e aporte
+   ===================================================================== */
+const FORMS=['menu','peca','material','despesa','aporte'];
+function abrirForm(qual){
+  FORMS.forEach(f=>{
+    const el=document.getElementById(f==='menu'?'nv-menu':'nv-'+f);
+    if(el)el.classList.toggle('hide',f!==qual);
+  });
+  window.scrollTo({top:0});
+  if(qual==='material'){ document.getElementById('mt-data').value=hoje(); previewMaterial(); listarMateriais(); }
+  if(qual==='despesa'){ document.getElementById('dp-data').value=hoje(); listarDespesas(); }
+  if(qual==='aporte'){ document.getElementById('ap-data').value=hoje(); listarAportes(); }
+  if(qual==='peca'){ prepararCadastro(); }
+}
+function voltarMenu(){ abrirForm('menu'); }
+
+/* ---------- material ---------- */
+function tipoMaterial(){
+  const t=document.getElementById('mt-tipo').value;
+  return t==='Outro'?(document.getElementById('mt-outro').value.trim()||'Outro'):t;
+}
+function previewMaterial(){
+  const ehOutro=document.getElementById('mt-tipo').value==='Outro';
+  document.getElementById('mt-outro-box').style.display=ehOutro?'block':'none';
+  const q=num('mt-qtd'), v=num('mt-valor');
+  const unit=q>0?v/q:0;
+  const atual=matPorTipo()[tipoMaterial()];
+  const depois=matUnit()-(atual?atual.unit:0)+
+    (atual?(atual.valor+v)/Math.max(1,atual.qtd+q):unit);
+  document.getElementById('mt-resumo').innerHTML=
+    '<div class="lin"><span>Custo por unidade</span><b>'+R$(unit)+'</b></div>'+
+    (atual?'<div class="lin"><span>Já comprados deste tipo</span><b>'+atual.qtd+' un · '+R$(atual.valor)+'</b></div>':'')+
+    '<div class="lin"><span>Material por peça — hoje</span><b>'+R$(matUnit())+'</b></div>'+
+    '<div class="lin tot"><span>Material por peça — depois</span><b>'+R$(depois)+'</b></div>'+
+    '<div class="lin"><span>Sai do caixa</span><b class="v-verm">− '+R$(v)+'</b></div>';
+}
+function salvarMaterial(){
+  const q=num('mt-qtd'), v=num('mt-valor');
+  if(q<=0){toast('Informe a quantidade comprada');return;}
+  if(v<=0){toast('Informe o valor total pago');return;}
+  S.materiais.push({id:'mt'+Date.now(),data:document.getElementById('mt-data').value||hoje(),
+    tipo:tipoMaterial(),qtd:q,valor:v,forn:document.getElementById('mt-forn').value.trim()});
+  salvar();
+  ['mt-qtd','mt-valor','mt-forn','mt-outro'].forEach(i=>document.getElementById(i).value='');
+  previewMaterial(); listarMateriais();
+  toast('Compra registrada · material por peça agora é '+R$(matUnit()));
+}
+function listarMateriais(){
+  const el=document.getElementById('mt-lista'); if(!el)return;
+  const porTipo=matPorTipo();
+  const L=(S.materiais||[]).slice().sort((a,b)=>(b.data+b.id).localeCompare(a.data+a.id));
+  if(!L.length){el.innerHTML='<div class="vazio" style="padding:26px"><div class="em">&#9873;</div>Nenhuma compra de material ainda.</div>';return;}
+  el.innerHTML=
+    '<div class="lin tot" style="margin:0 0 10px;padding-top:0;border:none"><span>Material por peça</span><b>'+R$(matUnit())+'</b></div>'+
+    Object.keys(porTipo).map(t=>'<div class="lin"><span>'+esc(t)+' · '+porTipo[t].qtd+' un</span><b>'+R$(porTipo[t].unit)+' / un</b></div>').join('')+
+    '<div style="height:12px"></div>'+
+    L.map(m=>'<div class="mov">'+
+      '<div class="mov-ic i-entrada">&#9873;</div>'+
+      '<div class="mov-c"><b>'+esc(m.tipo)+' · '+m.qtd+' un</b>'+
+        '<small>'+dataBR(m.data)+' · '+R$((+m.valor)/Math.max(1,+m.qtd))+' por unidade'+(m.forn?' · '+esc(m.forn):'')+'</small></div>'+
+      '<div class="mov-v">− '+R$(m.valor)+
+        '<br><button class="btn gho" style="padding:2px 7px;font-size:11px;margin-top:4px" onclick="apagarMaterial(\''+m.id+'\')">excluir</button></div>'+
+    '</div>').join('');
+}
+function apagarMaterial(id){
+  if(!confirm('Excluir esta compra de material? O custo por peça será recalculado.'))return;
+  S.materiais=S.materiais.filter(m=>m.id!==id); salvar(); listarMateriais(); previewMaterial(); toast('Compra excluída');
+}
+
+/* ---------- despesa ---------- */
+function salvarDespesa(){
+  const d=document.getElementById('dp-desc').value.trim(), v=num('dp-valor');
+  if(!d){toast('Informe a descrição');return;}
+  if(v<=0){toast('Informe o valor');return;}
+  const rateia=document.getElementById('dp-rateia').checked;
+  S.despesas.push({id:'dp'+Date.now(),data:document.getElementById('dp-data').value||hoje(),
+    desc:d,cat:document.getElementById('dp-cat').value,valor:v,rateia:rateia});
+  salvar();
+  document.getElementById('dp-desc').value=''; document.getElementById('dp-valor').value='';
+  document.getElementById('dp-rateia').checked=false;
+  listarDespesas(); toast(rateia?'Despesa rateada · preços recalculados':'Despesa registrada');
+}
+function listarDespesas(){
+  const el=document.getElementById('dp-lista'); if(!el)return;
+  const L=(S.despesas||[]).slice().sort((a,b)=>(b.data+b.id).localeCompare(a.data+a.id));
+  if(!L.length){el.innerHTML='<div class="vazio" style="padding:26px"><div class="em">&#8599;</div>Nenhuma despesa ainda.</div>';return;}
+  el.innerHTML='<div class="lin tot" style="margin:0 0 10px;padding-top:0;border:none"><span>Total de despesas</span><b class="v-verm">'+R$(somaDespesas())+'</b></div>'+
+    L.map(d=>'<div class="mov"><div class="mov-ic i-perda">&#8599;</div>'+
+      '<div class="mov-c"><b>'+esc(d.desc)+'</b><small>'+dataBR(d.data)+' · '+esc(d.cat||'')+(d.rateia?' · <span style="color:#C9A227">rateada nas peças</span>':'')+'</small></div>'+
+      '<div class="mov-v v-verm">− '+R$(d.valor)+
+        '<br><button class="btn gho" style="padding:2px 7px;font-size:11px;margin-top:4px" onclick="apagarDespesa(\''+d.id+'\')">excluir</button></div>'+
+    '</div>').join('');
+}
+function apagarDespesa(id){
+  if(!confirm('Excluir esta despesa?'))return;
+  S.despesas=S.despesas.filter(d=>d.id!==id); salvar(); listarDespesas(); toast('Despesa excluída');
+}
+
+/* ---------- aporte ---------- */
+function salvarAporte(){
+  const v=num('ap-valor');
+  if(v<=0){toast('Informe o valor do aporte');return;}
+  S.aportes.push({id:'ap'+Date.now(),data:document.getElementById('ap-data').value||hoje(),
+    desc:document.getElementById('ap-desc').value.trim()||'Aporte de capital',valor:v});
+  salvar();
+  document.getElementById('ap-desc').value=''; document.getElementById('ap-valor').value='';
+  listarAportes(); toast('Aporte registrado');
+}
+function listarAportes(){
+  const el=document.getElementById('ap-lista'); if(!el)return;
+  const L=(S.aportes||[]).slice().sort((a,b)=>(b.data+b.id).localeCompare(a.data+a.id));
+  if(!L.length){el.innerHTML='<div class="vazio" style="padding:26px"><div class="em">&#8600;</div>Nenhum aporte registrado.</div>';return;}
+  el.innerHTML='<div class="lin tot" style="margin:0 0 10px;padding-top:0;border:none"><span>Aporte total</span><b>'+R$(somaAportes())+'</b></div>'+
+    L.map(a=>'<div class="mov"><div class="mov-ic i-venda">&#8600;</div>'+
+      '<div class="mov-c"><b>'+esc(a.desc)+'</b><small>'+dataBR(a.data)+'</small></div>'+
+      '<div class="mov-v v-verde">+ '+R$(a.valor)+
+        '<br><button class="btn gho" style="padding:2px 7px;font-size:11px;margin-top:4px" onclick="apagarAporte(\''+a.id+'\')">excluir</button></div>'+
+    '</div>').join('');
+}
+function apagarAporte(id){
+  if(!confirm('Excluir este aporte?'))return;
+  S.aportes=S.aportes.filter(a=>a.id!==id); salvar(); listarAportes(); toast('Aporte excluído');
+}
+
+/* ---------------- cadastro de peça ---------------- */
 let editandoId=null;
 function prepararCadastro(){
   const sel=document.getElementById('n-cat');
@@ -908,17 +1174,18 @@ function limparCadastro(){
 
 /* ---------------- movimentos ---------------- */
 function renderMovs(){
-  const tipos=['Tudo','SAÍDA','ENTRADA','PERMUTA','PERDA','DEVOLUÇÃO'];
+  const tipos=['Tudo','SAÍDA','ENTRADA','MATERIAL','DESPESA','APORTE','PERMUTA','PERDA','DEVOLUÇÃO'];
+  const rot={'SAÍDA':'Vendas','ENTRADA':'Peças','MATERIAL':'Material','DESPESA':'Despesas','APORTE':'Aportes'};
   document.getElementById('chips-mov').innerHTML=tipos.map(t=>
-    `<button class="chip ${t===filtroMov?'on':''}" onclick="filtroMov='${t}';renderMovs()">${t==='SAÍDA'?'Vendas':(t==='ENTRADA'?'Compras':t)}</button>`).join('');
-  const lista=S.movs.filter(m=>filtroMov==='Tudo'||m.tipo===filtroMov)
-                    .slice().sort((a,b)=>(b.data+b.id).localeCompare(a.data+a.id));
-  const el=document.getElementById('lista-movs');
-  if(!lista.length){el.innerHTML='<div class="vazio"><div class="em">&#8645;</div>Nenhum movimento ainda.</div>';return;}
+    `<button class="chip ${t===filtroMov?'on':''}" onclick="filtroMov='${t}';renderMovs()">${rot[t]||t}</button>`).join('');
+
+  /* junta tudo que mexe no caixa numa linha do tempo só */
   const ic={'SAÍDA':['&#8599;','i-venda'],'ENTRADA':['&#8600;','i-entrada'],'PERMUTA':['&#9733;','i-permuta'],
-            'PERDA':['&#9888;','i-perda'],'DEVOLUÇÃO':['&#8630;','i-entrada']};
-  el.innerHTML=lista.map(m=>{
-    const p=peca(m.pecaId); const c=p?calc(p):null;
+            'PERDA':['&#9888;','i-perda'],'DEVOLUÇÃO':['&#8630;','i-entrada'],
+            'MATERIAL':['&#9873;','i-entrada'],'DESPESA':['&#8599;','i-perda'],'APORTE':['&#8600;','i-venda']};
+  let L=[];
+  S.movs.forEach(m=>{
+    const p=peca(m.pecaId), c=p?calc(p):null;
     const rec=m.tipo==='SAÍDA'?(m.taxa?m.valor/(1-m.taxa/100):m.valor):m.valor;
     let val='',cls='';
     if(m.tipo==='SAÍDA'){val='+ '+R$(rec);cls='v-verde';}
@@ -927,15 +1194,31 @@ function renderMovs(){
     else if(m.tipo==='PERDA'){val=c?'− '+R$(c.aquis):'—';cls='v-verm';}
     else {val='− '+R$(m.valor);cls='v-verm';}
     const det=[dataBR(m.data)];
-    if(m.tipo==='SAÍDA'){det.push(m.pgto+(m.pgto==='Cartão'?' '+m.parc+'x ('+m.taxa+'%)':''));}
+    if(m.tipo==='SAÍDA')det.push(m.pgto+(m.pgto==='Cartão'?' '+m.parc+'x ('+m.taxa+'%)':''));
     if(m.cliente)det.push(m.cliente);
     if(m.obs)det.push(m.obs);
-    return `<div class="mov">
-      <div class="mov-ic ${ic[m.tipo][1]}">${ic[m.tipo][0]}</div>
-      <div class="mov-c"><b>${p?esc(p.nome):'peça removida'}</b><small>${esc(det.join(' · '))}</small></div>
-      <div class="mov-v ${cls}">${val}<br><button class="btn gho" style="padding:2px 7px;font-size:11px;margin-top:4px" onclick="apagarMov('${m.id}')">excluir</button></div>
-    </div>`;
-  }).join('');
+    L.push({tipo:m.tipo,data:m.data,id:m.id,titulo:p?p.nome:'peça removida',
+            sub:det.join(' · '),val:val,cls:cls,del:"apagarMov('"+m.id+"')"});
+  });
+  (S.materiais||[]).forEach(m=>L.push({tipo:'MATERIAL',data:m.data,id:m.id,
+    titulo:m.tipo+' · '+m.qtd+' un',
+    sub:dataBR(m.data)+' · '+R$((+m.valor)/Math.max(1,+m.qtd))+' por unidade'+(m.forn?' · '+m.forn:''),
+    val:'− '+R$(m.valor),cls:'',del:"apagarMaterial('"+m.id+"')"}));
+  (S.despesas||[]).forEach(d=>L.push({tipo:'DESPESA',data:d.data,id:d.id,titulo:d.desc,
+    sub:dataBR(d.data)+' · '+(d.cat||'')+(d.rateia?' · rateada nas peças':''),
+    val:'− '+R$(d.valor),cls:'v-verm',del:"apagarDespesa('"+d.id+"')"}));
+  (S.aportes||[]).forEach(a=>L.push({tipo:'APORTE',data:a.data,id:a.id,titulo:a.desc,
+    sub:dataBR(a.data),val:'+ '+R$(a.valor),cls:'v-verde',del:"apagarAporte('"+a.id+"')"}));
+
+  L=L.filter(x=>filtroMov==='Tudo'||x.tipo===filtroMov)
+     .sort((a,b)=>(b.data+b.id).localeCompare(a.data+a.id));
+  const el=document.getElementById('lista-movs');
+  if(!L.length){el.innerHTML='<div class="vazio"><div class="em">&#8645;</div>Nada registrado aqui ainda.</div>';return;}
+  el.innerHTML=L.map(x=>`<div class="mov">
+      <div class="mov-ic ${ic[x.tipo][1]}">${ic[x.tipo][0]}</div>
+      <div class="mov-c"><b>${esc(x.titulo)}</b><small>${esc(x.sub)}</small></div>
+      <div class="mov-v ${x.cls}">${x.val}<br><button class="btn gho" style="padding:2px 7px;font-size:11px;margin-top:4px" onclick="${x.del};renderMovs()">excluir</button></div>
+    </div>`).join('');
 }
 function apagarMov(id){
   if(!confirm('Excluir este movimento? A peça volta ao estado anterior.'))return;
@@ -946,15 +1229,13 @@ function apagarMov(id){
 function renderConfig(){
   const c=S.cfg;
   const set=(id,v)=>document.getElementById(id).value=v;
-  set('c-tag',c.material.tag); set('c-sacola',c.material.sacola); set('c-adesivo',c.material.adesivo);
-  set('c-cartaog',c.material.cartaog); set('c-outros',c.material.outros);
   set('c-arred',c.arred); set('c-term',c.term); set('c-perda',c.perda); set('c-imposto',c.imposto);
   set('c-maxparc',c.maxParc); set('c-sam',c.splitSam); set('c-cun',c.splitCun);
-  set('c-frete',c.frete); set('c-permmin',c.permMin);
+  set('c-permmin',c.permMin);
   set('c-gdid',c.gdClientId||''); set('c-gdfile',c.gdArquivo||'sahga-backup.json');
   document.getElementById('c-gdauto').checked=!!c.gdAuto;
   gdStatus();
-  document.getElementById('c-mat-total').textContent=R$(matUnit());
+  renderMatResumo();
   const ex=T_EXEMPLO();
   document.getElementById('c-taxas').innerHTML=Object.keys(c.taxasCartao)
     .map(Number).sort((a,b)=>a-b).filter(n=>n<=(+c.maxParc||3)).map(n=>{
@@ -970,16 +1251,24 @@ function renderConfig(){
         style="width:86px;padding:7px 9px;background:var(--grafite);border:1px solid var(--linha);border-radius:9px;color:var(--texto);text-align:center"
         onchange="S.cfg.mult['${esc(k)}']=parseFloat(this.value)||1.9;salvar();renderConfig()"></div>`).join('');
 }
+function renderMatResumo(){
+  const tot=document.getElementById('c-mat-total'); if(tot)tot.textContent=R$(matUnit());
+  const el=document.getElementById('c-mat-resumo'); if(!el)return;
+  const r=matPorTipo(), tipos=Object.keys(r);
+  el.innerHTML=tipos.length
+    ? tipos.map(k=>'<div class="lin"><span>'+esc(k)+' <small style="color:var(--texto2)">· '+r[k].qtd+' un compradas</small></span><b>'+R$(r[k].unit)+' / un</b></div>').join('')
+    : '<div style="color:var(--texto2);font-size:12.5px;padding:4px 0 10px">Nenhuma compra de material registrada. Enquanto não houver, o material entra como R$ 0,00 no custo.</div>';
+}
+
 function salvarConfig(){
   const g=id=>num(id);
-  S.cfg.material={tag:g('c-tag'),sacola:g('c-sacola'),adesivo:g('c-adesivo'),cartaog:g('c-cartaog'),outros:g('c-outros')};
   S.cfg.arred=g('c-arred')||10; S.cfg.term=g('c-term'); S.cfg.perda=g('c-perda'); S.cfg.imposto=g('c-imposto');
   S.cfg.maxParc=parseInt(document.getElementById('c-maxparc').value)||3;
-  S.cfg.splitSam=g('c-sam'); S.cfg.splitCun=g('c-cun'); S.cfg.frete=g('c-frete'); S.cfg.permMin=g('c-permmin');
+  S.cfg.splitSam=g('c-sam'); S.cfg.splitCun=g('c-cun'); S.cfg.permMin=g('c-permmin');
   S.cfg.gdClientId=document.getElementById('c-gdid').value.trim();
   S.cfg.gdArquivo=document.getElementById('c-gdfile').value.trim()||'sahga-backup.json';
   S.cfg.gdAuto=document.getElementById('c-gdauto').checked;
-  document.getElementById('c-mat-total').textContent=R$(matUnit());
+  renderMatResumo();
   salvar(); gdStatus();
 }
 
@@ -1028,7 +1317,9 @@ function importar(ev){
       S.cfg.taxasCartao=Object.assign({},CFG_PADRAO.taxasCartao,(d.cfg||{}).taxasCartao||{});
       delete S.cfg.taxaCartao;
       S.cfg.gdClientId=gId||S.cfg.gdClientId; S.cfg.gdArquivo=gArq||S.cfg.gdArquivo; S.cfg.gdAuto=gAuto;
-      S.pecas=d.pecas; S.movs=d.movs; salvar();
+      S.pecas=d.pecas; S.movs=d.movs;
+      S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
+      salvar();
       fechar('ov-bk'); ir('painel'); toast('Backup restaurado');
     }catch(err){toast('Arquivo inválido');}
   };
@@ -1225,6 +1516,7 @@ async function gdRestaurar(auto){
     delete S.cfg.taxaCartao;
     S.cfg.gdClientId=guardaId; S.cfg.gdArquivo=guardaArq; S.cfg.gdAuto=guardaAuto;
     S.pecas=d.pecas; S.movs=d.movs;
+    S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
     try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){}
     gdStatus(); ir('painel'); toast('Dados restaurados do Drive');
   }catch(e){ gdStatus(e.message,'erro'); toast('Falha ao restaurar'); }
