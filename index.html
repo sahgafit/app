@@ -240,6 +240,7 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 <main>
   <!-- ============ PAINEL ============ -->
   <div class="page" id="pg-painel">
+    <div id="gd-card"></div>
     <div class="grid g2">
       <div class="card kpi ouro"><div class="lab">Em estoque</div><div class="val" id="k-estoque">0</div><div class="sub" id="k-estoque-sub">0 peças compradas</div></div>
       <div class="card kpi"><div class="lab">Caixa livre</div><div class="val" id="k-caixa">R$ 0</div><div class="sub">após retiradas</div></div>
@@ -496,7 +497,9 @@ let tela='painel', filtroCat='Todas', filtroMov='Tudo';
 let ctxSaida=null;
 
 /* ---------------- persistência ---------------- */
+let primeiraVez=false;        /* true quando o aparelho ainda não tinha dados salvos */
 function carregar(){
+  primeiraVez=false;
   try{
     const raw=localStorage.getItem(KEY);
     if(raw){
@@ -512,6 +515,7 @@ function carregar(){
       return;
     }
   }catch(e){}
+  primeiraVez=true;
   semear();
 }
 function salvar(){
@@ -655,6 +659,7 @@ function renderPainel(){
   const base=T.lucro+T.permCusto;
   g('k-perm-p',(base>0?(T.permCusto/base*100):0).toFixed(1)+'%');
   g('k-atual','Atualizado em '+new Date().toLocaleDateString('pt-BR'));
+  gdCard();
 }
 
 /* ---------------- estoque ---------------- */
@@ -1044,7 +1049,7 @@ function fechar(id){document.getElementById(id).classList.remove('on');}
    O token fica só na memória (nunca em disco) e vale cerca de 1 hora.
    ===================================================================== */
 const GD_ESCOPO='https://www.googleapis.com/auth/drive.file';
-let gdToken=null, gdExpira=0, gdCliente=null, gdArquivoId=null, gdOcupado=false, gdTimer=null;
+let gdToken=null, gdExpira=0, gdCliente=null, gdArquivoId=null, gdOcupado=false, gdTimer=null, gdUltimo='';
 
 const gdConectado=()=>!!gdToken&&Date.now()<gdExpira;
 const gdNomeArquivo=()=>(S.cfg.gdArquivo||'sahga-backup.json').trim()||'sahga-backup.json';
@@ -1059,6 +1064,56 @@ function gdStatus(msg,cor){
   el.style.color       = c==='ok'?'#4ADE80':(c==='erro'?'#F87171':'#FBBF24');
   const b=document.getElementById('gd-btn-conectar');
   if(b)b.textContent=conectado?'Reconectar':'Conectar ao Google Drive';
+  gdCard();
+}
+
+/* faixa do Drive no topo do Painel */
+function gdCard(){
+  const el=document.getElementById('gd-card'); if(!el)return;
+  if(!S.cfg.gdClientId){ el.innerHTML=''; return; }
+  if(gdConectado()){
+    el.innerHTML=
+      '<div class="card" style="display:flex;align-items:center;gap:11px;padding:11px 13px;margin-bottom:12px;border-color:rgba(74,222,128,.22)">'+
+        '<span style="color:#4ADE80;font-size:13px;line-height:1">&#9679;</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:12.5px;font-weight:600">Google Drive conectado</div>'+
+          '<div style="font-size:11px;color:var(--texto2)">'+(gdUltimo?'Último backup às '+gdUltimo:'Backup automático ativo')+'</div>'+
+        '</div>'+
+        '<button class="btn" style="padding:7px 12px;font-size:12px;flex:0 0 auto" onclick="gdSalvar(true)">Salvar</button>'+
+      '</div>';
+  }else{
+    el.innerHTML=
+      '<div class="card" style="margin-bottom:12px;border-color:rgba(201,162,39,.32);background:linear-gradient(160deg,#171207,#111)">'+
+        '<div style="font-size:13.5px;font-weight:600;margin-bottom:3px">Backup no Google Drive</div>'+
+        '<div style="font-size:11.5px;color:var(--texto2);margin-bottom:12px">Conecte uma vez. Depois o app salva sozinho a cada alteração.</div>'+
+        '<button class="btn pri full" onclick="gdConectar()">Conectar ao Google Drive</button>'+
+      '</div>';
+  }
+}
+
+/* espera a biblioteca do Google terminar de carregar */
+function gdEsperarGIS(ms){
+  return new Promise(ok=>{
+    const t0=Date.now();
+    (function ver(){
+      if(window.google&&google.accounts&&google.accounts.oauth2)return ok(true);
+      if(Date.now()-t0>(ms||7000))return ok(false);
+      setTimeout(ver,150);
+    })();
+  });
+}
+
+/* ao abrir o app: reconecta em silêncio, sem pedir nada ao usuário.
+   Só funciona depois que a conta já foi autorizada uma vez. */
+async function gdAutoConectar(){
+  if(!S.cfg.gdClientId)return;
+  if(!await gdEsperarGIS(7000)){ gdCard(); return; }
+  try{
+    await gdPedirToken(true);
+    await gdLocalizar();
+    gdStatus();
+    if(primeiraVez&&gdArquivoId)gdRestaurar(true);   /* aparelho novo com backup no Drive */
+  }catch(e){ gdCard(); }                             /* precisa de toque: mostra o botão */
 }
 
 function gdPedirToken(silencioso){
@@ -1142,24 +1197,26 @@ async function gdSalvar(manual){
     const r=await gdApi(url,{method:gdArquivoId?'PATCH':'POST',
       headers:{'Content-Type':'multipart/related; boundary='+lim},body:body});
     const d=await r.json(); if(d&&d.id)gdArquivoId=d.id;
-    const h=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    gdStatus('Salvo no Drive às '+h,'ok');
+    gdUltimo=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    gdStatus('Salvo no Drive às '+gdUltimo,'ok');
     if(manual)toast('Backup salvo no Drive');
   }catch(e){ gdStatus(e.message,'erro'); if(manual)toast('Falha ao salvar no Drive'); }
   finally{ gdOcupado=false; }
 }
 
-async function gdRestaurar(){
+async function gdRestaurar(auto){
   try{
     if(!gdConectado()){ await gdConectar(); if(!gdConectado())return; }
     gdStatus('Procurando o backup...','off');
     await gdLocalizar();
-    if(!gdArquivoId){ gdStatus('Nenhum backup encontrado no Drive','erro'); toast('Nada para restaurar'); return; }
+    if(!gdArquivoId){ gdStatus('Nenhum backup encontrado no Drive','erro'); if(!auto)toast('Nada para restaurar'); return; }
     const r=await gdApi('https://www.googleapis.com/drive/v3/files/'+gdArquivoId+'?alt=media');
     const d=await r.json();
     if(!d||!d.pecas||!d.movs)throw new Error('O arquivo do Drive não está no formato esperado.');
-    if(!confirm('Restaurar o backup do Drive? Os dados atuais deste aparelho serão substituídos.')){
-      gdStatus(); return; }
+    const pergunta=auto
+      ? 'Encontrei um backup da SAHGA no seu Drive, com '+d.pecas.length+' peça(s). Carregar os dados dele neste aparelho?'
+      : 'Restaurar o backup do Drive? Os dados atuais deste aparelho serão substituídos.';
+    if(!confirm(pergunta)){ gdStatus(); return; }
     const guardaId=S.cfg.gdClientId, guardaArq=S.cfg.gdArquivo, guardaAuto=S.cfg.gdAuto;
     S.cfg=Object.assign({},CFG_PADRAO,d.cfg||{});
     S.cfg.material=Object.assign({},CFG_PADRAO.material,(d.cfg||{}).material||{});
@@ -1181,7 +1238,7 @@ function gdAgendar(){
 }
 
 /* ---------------- início ---------------- */
-carregar(); prepararCadastro(); ir('painel');
+carregar(); prepararCadastro(); ir('painel'); gdAutoConectar();
 </script>
 </body>
 </html>
