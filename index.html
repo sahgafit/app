@@ -43,7 +43,9 @@ header{
   padding-top:calc(10px + env(safe-area-inset-top,0px));
 }
 header img{height:30px;width:auto;display:block}
-header .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ouro-fraco);margin-top:1px}
+header .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ouro-fraco);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:480px){header .tag{display:none}header img{height:26px}}
 header .brand{flex:1;min-width:0}
 header .brand b{font-size:15px;letter-spacing:.22em;color:var(--ouro-claro);font-weight:600}
 .icon-btn{
@@ -51,6 +53,19 @@ header .brand b{font-size:15px;letter-spacing:.22em;color:var(--ouro-claro);font
   width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer;font-size:17px
 }
 .icon-btn:active{background:var(--linha)}
+/* botões de sincronia com o Drive, no cabeçalho */
+.hdr-btn{
+  flex:0 0 auto;display:flex;align-items:center;gap:6px;cursor:pointer;
+  background:var(--grafite);border:1px solid var(--linha);color:var(--texto);
+  border-radius:10px;padding:6px 9px;font-size:10.5px;line-height:1.15;font-weight:600;
+  letter-spacing:.01em;text-align:left;white-space:nowrap
+}
+.hdr-btn .ic{font-size:15px;line-height:1}
+.hdr-btn:active{transform:scale(.97)}
+.hdr-btn.pri{background:rgba(201,162,39,.16);border-color:var(--ouro-fraco);color:var(--ouro-claro)}
+.hdr-btn:disabled{opacity:.4}
+.hdr-btn.ocupado{opacity:.55}
+@media(max-width:360px){.hdr-btn span:not(.ic){display:none}.hdr-btn{padding:8px 10px}}
 
 main{padding:16px;max-width:1100px;margin:0 auto}
 .page{animation:fade .18s ease}
@@ -242,7 +257,10 @@ nav button.add.on .ic{background:var(--ouro-claro)}
     <b>SAHGA</b>
     <div class="tag">Toda jornada tem uma Sahga</div>
   </div>
-  <button class="icon-btn" onclick="abrirBackup()" title="Backup">&#8681;</button>
+  <button class="hdr-btn" id="hdr-baixar" onclick="gdRestaurar()" title="Baixar o estoque salvo no Google Drive para este aparelho">
+    <span class="ic">&#8681;</span><span>Baixar<br>estoque</span></button>
+  <button class="hdr-btn pri" id="hdr-enviar" onclick="gdSalvar(true)" title="Enviar o estoque deste aparelho para o Google Drive">
+    <span class="ic">&#8679;</span><span>Enviar<br>estoque</span></button>
 </header>
 
 <main>
@@ -559,17 +577,6 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 </div>
 
 <!-- ============ MODAL BACKUP RÁPIDO ============ -->
-<div class="overlay" id="ov-bk" onclick="if(event.target===this)fechar('ov-bk')">
-  <div class="modal">
-    <div class="modal-h"><div><h3>Backup</h3><div class="sub">Guarde seus dados</div></div>
-      <button class="icon-btn" onclick="fechar('ov-bk')">&times;</button></div>
-    <button class="btn pri full" style="margin-bottom:9px" onclick="gdSalvar(true);fechar('ov-bk')">Salvar no Google Drive</button>
-    <button class="btn full" style="margin-bottom:9px" onclick="gdRestaurar();fechar('ov-bk')">Restaurar do Google Drive</button>
-    <button class="btn full" style="margin-bottom:9px" onclick="exportar()">Baixar backup (.json)</button>
-    <button class="btn full" style="margin-bottom:9px" onclick="exportarCSV()">Exportar movimentos (.csv)</button>
-    <button class="btn full" onclick="document.getElementById('imp').click()">Restaurar arquivo (.json)</button>
-  </div>
-</div>
 
 
 <script>
@@ -1432,7 +1439,7 @@ function importar(ev){
       S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
       S.dividendos=d.dividendos||[];
       salvar();
-      fechar('ov-bk'); ir('painel'); toast('Backup restaurado');
+      ir('painel'); toast('Backup restaurado do arquivo');
     }catch(err){toast('Arquivo inválido');}
   };
   r.readAsText(f); ev.target.value='';
@@ -1442,7 +1449,6 @@ function zerar(){
   if(!confirm('Tem certeza? Faça um backup antes.'))return;
   semear(); ir('painel'); toast('Dados reiniciados');
 }
-function abrirBackup(){document.getElementById('ov-bk').classList.add('on');}
 function fechar(id){document.getElementById(id).classList.remove('on');}
 
 /* =====================================================================
@@ -1456,6 +1462,20 @@ let gdToken=null, gdExpira=0, gdCliente=null, gdArquivoId=null, gdOcupado=false,
 
 const gdConectado=()=>!!gdToken&&Date.now()<gdExpira;
 const gdNomeArquivo=()=>(S.cfg.gdArquivo||'sahga-backup.json').trim()||'sahga-backup.json';
+
+function gdOcupar(on,qual){
+  ['hdr-baixar','hdr-enviar'].forEach(id=>{
+    const b=document.getElementById(id); if(!b)return;
+    b.disabled=!!on; b.classList.toggle('ocupado',!!on);
+  });
+  const b=document.getElementById(qual==='baixar'?'hdr-baixar':'hdr-enviar');
+  if(b&&on)b.querySelector('.ic').textContent='…';
+  if(!on){
+    const a=document.getElementById('hdr-baixar'), e=document.getElementById('hdr-enviar');
+    if(a)a.querySelector('.ic').innerHTML='&#8681;';
+    if(e)e.querySelector('.ic').innerHTML='&#8679;';
+  }
+}
 
 function gdStatus(msg,cor){
   const el=document.getElementById('gd-status'); if(!el)return;
@@ -1585,9 +1605,10 @@ async function gdSalvar(manual){
     if(manual){ await gdConectar(); if(!gdConectado())return; } else return;
   }
   if(gdOcupado)return;
-  gdOcupado=true;
+  gdOcupado=true; if(manual)gdOcupar(true,'enviar');
   try{
-    gdStatus('Salvando no Drive...','off');
+    gdStatus('Enviando para o Drive...','off');
+    if(manual)toast('Enviando estoque para o Google Drive...');
     if(gdArquivoId===null)await gdLocalizar();
     const corpo=JSON.stringify(S,null,2);
     const lim='-------sahga'+Date.now();
@@ -1602,24 +1623,26 @@ async function gdSalvar(manual){
     const d=await r.json(); if(d&&d.id)gdArquivoId=d.id;
     gdUltimo=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     gdStatus('Salvo no Drive às '+gdUltimo,'ok');
-    if(manual)toast('Backup salvo no Drive');
-  }catch(e){ gdStatus(e.message,'erro'); if(manual)toast('Falha ao salvar no Drive'); }
-  finally{ gdOcupado=false; }
+    if(manual)toast('Estoque enviado para o Google Drive às '+gdUltimo);
+  }catch(e){ gdStatus(e.message,'erro'); if(manual)toast('Não consegui enviar: '+String(e.message).slice(0,110)); }
+  finally{ gdOcupado=false; if(manual)gdOcupar(false); }
 }
 
 async function gdRestaurar(auto){
   try{
     if(!gdConectado()){ await gdConectar(); if(!gdConectado())return; }
+    if(!auto){ gdOcupar(true,'baixar'); toast('Procurando o estoque no Google Drive...'); }
     gdStatus('Procurando o backup...','off');
     await gdLocalizar();
-    if(!gdArquivoId){ gdStatus('Nenhum backup encontrado no Drive','erro'); if(!auto)toast('Nada para restaurar'); return; }
+    if(!gdArquivoId){ gdStatus('Nenhum backup encontrado no Drive','erro'); gdOcupar(false);
+      if(!auto)toast('Nenhum estoque salvo encontrado no seu Drive. Use "Enviar estoque" primeiro.'); return; }
     const r=await gdApi('https://www.googleapis.com/drive/v3/files/'+gdArquivoId+'?alt=media');
     const d=await r.json();
     if(!d||!d.pecas||!d.movs)throw new Error('O arquivo do Drive não está no formato esperado.');
     const pergunta=auto
       ? 'Encontrei um backup da SAHGA no seu Drive, com '+d.pecas.length+' peça(s). Carregar os dados dele neste aparelho?'
       : 'Restaurar o backup do Drive? Os dados atuais deste aparelho serão substituídos.';
-    if(!confirm(pergunta)){ gdStatus(); return; }
+    if(!confirm(pergunta)){ gdStatus(); gdOcupar(false); return; }
     const guardaId=S.cfg.gdClientId, guardaArq=S.cfg.gdArquivo, guardaAuto=S.cfg.gdAuto;
     S.cfg=Object.assign({},CFG_PADRAO,d.cfg||{});
     S.cfg.material=Object.assign({},CFG_PADRAO.material,(d.cfg||{}).material||{});
@@ -1631,8 +1654,9 @@ async function gdRestaurar(auto){
     S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
     S.dividendos=d.dividendos||[];
     try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){}
-    gdStatus(); ir('painel'); toast('Dados restaurados do Drive');
-  }catch(e){ gdStatus(e.message,'erro'); toast('Falha ao restaurar'); }
+    gdStatus(); gdOcupar(false); ir('painel');
+    toast('Estoque baixado do Drive · '+S.pecas.length+' peça(s) e '+S.movs.length+' movimento(s)');
+  }catch(e){ gdStatus(e.message,'erro'); gdOcupar(false); toast('Não consegui baixar: '+String(e.message).slice(0,110)); }
 }
 
 /* chamado por salvar(): agrupa alterações seguidas num único envio */
