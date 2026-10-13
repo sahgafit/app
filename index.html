@@ -221,15 +221,12 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 .opt b{display:block;font-size:14.5px;font-weight:600;margin-bottom:2px}
 .opt small{display:block;font-size:11.5px;color:var(--texto2);line-height:1.35}
 
+#msg{
+  background:var(--grafite);border:1px solid var(--ouro-fraco);border-left:3px solid var(--ouro);
+  border-radius:11px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;color:var(--ouro-claro)
+}
 .vazio{text-align:center;padding:46px 20px;color:var(--texto2)}
 .vazio .em{font-size:32px;margin-bottom:10px;opacity:.5}
-.toast{
-  position:fixed;left:50%;transform:translateX(-50%) translateY(100px);
-  bottom:calc(88px + var(--safe-b));background:var(--ouro);color:#0B0B0B;padding:11px 20px;
-  border-radius:99px;font-size:13.5px;font-weight:600;z-index:200;transition:transform .25s;
-  box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:90vw;text-align:center
-}
-.toast.on{transform:translateX(-50%) translateY(0)}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tbl th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--texto2);padding:8px 6px;border-bottom:1px solid var(--linha);font-weight:600}
 .tbl td{padding:9px 6px;border-bottom:1px solid var(--linha)}
@@ -249,6 +246,7 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 </header>
 
 <main>
+  <div id="msg" class="hide"></div>
   <!-- ============ PAINEL ============ -->
   <div class="page" id="pg-painel">
     <div id="gd-card"></div>
@@ -266,7 +264,7 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <div class="lin"><span>(−) Compra de peças</span><b id="k-c-pecas">R$ 0</b></div>
       <div class="lin"><span>(−) Compra de material</span><b id="k-c-mat">R$ 0</b></div>
       <div class="lin"><span>(−) Despesas</span><b id="k-c-desp">R$ 0</b></div>
-      <div class="lin"><span>(−) Retirada da cunhada</span><b id="k-c-ret">R$ 0</b></div>
+      <div class="lin"><span>(−) Distribuição de lucro</span><b id="k-c-ret">R$ 0</b></div>
       <div class="lin tot"><span>Saldo em caixa</span><b id="k-c-saldo">R$ 0</b></div>
     </div>
 
@@ -279,10 +277,16 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <div class="lin"><span>Caixa que entra por peça</span><b id="k-porpeca">R$ 0</b></div>
     </div>
 
-    <div class="sec"><h2>Divisão dos sócios</h2></div>
-    <div class="grid g2">
-      <div class="card kpi"><div class="lab">Samuel — reinveste</div><div class="val" id="k-sam">R$ 0</div><div class="sub">volta para estoque</div></div>
-      <div class="card kpi"><div class="lab">Cunhada — retira</div><div class="val" id="k-cun">R$ 0</div><div class="sub">a pagar / pago</div></div>
+    <div class="sec"><h2>Divisão dos sócios</h2><button class="lnk" onclick="ir('novo');abrirForm('dividendo')">+ retirada</button></div>
+    <div class="card">
+      <div class="lin"><span>Lucro acumulado</span><b id="k-lucro2">R$ 0</b></div>
+      <div class="lin" style="margin-top:6px"><span><b>Samuel</b> — direito</span><b id="k-sam">R$ 0</b></div>
+      <div class="lin"><span>já retirou</span><b id="k-sam-pago">R$ 0</b></div>
+      <div class="lin"><span>a receber</span><b class="v-ouro" id="k-sam-saldo">R$ 0</b></div>
+      <div class="lin" style="margin-top:10px"><span><b>Sara</b> — direito</span><b id="k-cun">R$ 0</b></div>
+      <div class="lin"><span>já retirou</span><b id="k-sara-pago">R$ 0</b></div>
+      <div class="lin"><span>a receber</span><b class="v-ouro" id="k-sara-saldo">R$ 0</b></div>
+      <div class="lin tot"><span>Total já distribuído</span><b id="k-div-total">R$ 0</b></div>
     </div>
 
     <div class="sec"><h2>Se vender todo o estoque</h2></div>
@@ -326,6 +330,34 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <button class="opt" onclick="abrirForm('aporte')">
         <span class="opt-ic" style="background:rgba(74,222,128,.14);color:#4ADE80">&#8600;</span>
         <span><b>Aporte de capital</b><small>Dinheiro que você coloca no negócio</small></span></button>
+      <button class="opt" onclick="abrirForm('dividendo')">
+        <span class="opt-ic" style="background:rgba(201,162,39,.15);color:#E8CF7E">&#9878;</span>
+        <span><b>Distribuição de lucro</b><small>Retirada de dividendos por você ou pela Sara</small></span></button>
+    </div>
+
+    <!-- dividendo -->
+    <div id="nv-dividendo" class="hide">
+      <div class="sec"><h2>Distribuição de lucro</h2><button class="lnk" onclick="voltarMenu()">voltar</button></div>
+      <div class="card">
+        <div id="dv-saldos" class="resumo" style="margin-top:0"></div>
+        <div class="f"><label>Sócio *</label>
+          <div class="seg" style="grid-template-columns:1fr 1fr">
+            <button id="dv-b-samuel" class="on" onclick="escolherSocio('Samuel')">Samuel</button>
+            <button id="dv-b-sara" onclick="escolherSocio('Sara')">Sara</button>
+          </div></div>
+        <div class="frow">
+          <div class="f"><label>Valor retirado (R$) *</label>
+            <input id="dv-valor" type="number" inputmode="decimal" step="0.01" placeholder="0,00" oninput="previewDividendo()"></div>
+          <div class="f"><label>Data</label><input type="date" id="dv-data"></div>
+        </div>
+        <div class="f"><label>Observação</label><input id="dv-obs" placeholder="Ex.: fechamento de outubro"></div>
+        <div id="dv-alerta"></div>
+        <button class="btn pri full" onclick="salvarDividendo()">Registrar retirada</button>
+      </div>
+      <div class="aviso">Sai do caixa na data informada. O lucro acumulado não muda — o que muda é
+        quanto cada sócio ainda tem a receber.</div>
+      <div class="sec"><h2>Retiradas registradas</h2></div>
+      <div class="card" id="dv-lista"></div>
     </div>
 
     <!-- material -->
@@ -350,8 +382,8 @@ nav button.add.on .ic{background:var(--ouro-claro)}
         <div class="resumo" id="mt-resumo"></div>
         <button class="btn pri full" onclick="salvarMaterial()">Registrar compra</button>
       </div>
-      <div class="aviso">O custo por unidade é calculado sozinho e entra no preço de venda das peças.
-        O valor total sai do caixa na data informada.</div>
+      <div class="aviso">O custo por unidade é calculado sozinho e <b>desconta do lucro</b> de cada peça vendida.
+        O valor total sai do caixa na data da compra. Os preços de venda não mudam.</div>
       <div class="sec"><h2>Compras registradas</h2></div>
       <div class="card" id="mt-lista"></div>
     </div>
@@ -439,7 +471,7 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <div class="lin tot"><span>Material por peça</span><b id="c-mat-total">R$ 0,00</b></div>
       <div class="dica" style="margin-top:8px;font-size:11.5px;color:var(--texto2)">
         Calculado a partir das suas compras: valor pago dividido pela quantidade, por tipo.
-        Entra no custo <b>antes</b> do multiplicador, então o preço de venda se ajusta sozinho.</div>
+        Sai do <b>lucro</b> de cada peça vendida. Não entra no preço de venda — comprar embalagem não encarece a peça para a cliente.</div>
     </div>
 
     <div class="sec"><h2>Multiplicador por categoria</h2></div>
@@ -473,7 +505,7 @@ nav button.add.on .ic{background:var(--ouro-claro)}
     <div class="card">
       <div class="frow">
         <div class="f"><label>Samuel (%)</label><input type="number" step="1" inputmode="numeric" id="c-sam" oninput="salvarConfig()"></div>
-        <div class="f"><label>Cunhada (%)</label><input type="number" step="1" inputmode="numeric" id="c-cun" oninput="salvarConfig()"></div>
+        <div class="f"><label>Sara (%)</label><input type="number" step="1" inputmode="numeric" id="c-cun" oninput="salvarConfig()"></div>
       </div>
       <div class="f"><label>Mínimo de vendas no mês p/ liberar permuta</label><input type="number" step="1" inputmode="numeric" id="c-permmin" oninput="salvarConfig()"></div>
     </div>
@@ -539,7 +571,6 @@ nav button.add.on .ic{background:var(--ouro-claro)}
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
 
 <script>
 /* =====================================================================
@@ -596,7 +627,7 @@ const SEED=[
  ['69359','Macaquinho Yasmin','Macaquinho','M','Preto',80,'41644','2026-09-23']
 ];
 
-let S={cfg:JSON.parse(JSON.stringify(CFG_PADRAO)),pecas:[],movs:[],materiais:[],despesas:[],aportes:[]};
+let S={cfg:JSON.parse(JSON.stringify(CFG_PADRAO)),pecas:[],movs:[],materiais:[],despesas:[],aportes:[],dividendos:[]};
 let tela='painel', filtroCat='Todas', filtroMov='Tudo';
 let ctxSaida=null;
 
@@ -617,6 +648,7 @@ function carregar(){
       if(!S.cfg.gdArquivo)S.cfg.gdArquivo=CFG_PADRAO.gdArquivo;
       S.pecas=d.pecas||[]; S.movs=d.movs||[];
       S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
+      S.dividendos=d.dividendos||[];
       return;
     }
   }catch(e){}
@@ -635,7 +667,7 @@ function aportesDosLotes(){
 }
 
 function semear(){
-  S.pecas=[]; S.movs=[]; S.materiais=[]; S.despesas=[]; S.aportes=aportesDosLotes();
+  S.pecas=[]; S.movs=[]; S.materiais=[]; S.despesas=[]; S.aportes=aportesDosLotes(); S.dividendos=[];
   SEED.forEach((x,i)=>{
     const id='p'+(i+1);
     S.pecas.push({id:id,cod:x[0],nome:x[1],cat:x[2],tam:x[3],cor:x[4],custo:x[5],extra:0,lote:x[6],precoManual:null,criado:x[7]});
@@ -650,7 +682,13 @@ const R0=v=>'R$ '+Math.round(v||0).toLocaleString('pt-BR');
 const num=id=>{const v=parseFloat(String(document.getElementById(id).value).replace(',','.'));return isNaN(v)?0:v;};
 const hoje=()=>new Date().toISOString().slice(0,10);
 const dataBR=s=>{const p=String(s).slice(0,10).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;};
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2400);}
+/* mensagem no topo do conteúdo — não flutua sobre a tela */
+function toast(m){
+  const el=document.getElementById('msg'); if(!el)return;
+  if(!m){el.classList.add('hide');return;}
+  el.textContent=m; el.classList.remove('hide');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.add('hide'),5000);
+}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 /* ---------------- motor de cálculo ---------------- */
@@ -674,6 +712,7 @@ function matUnit(){
 const somaMateriais=()=>(S.materiais||[]).reduce((a,m)=>a+(+m.valor||0),0);
 const somaDespesas =()=>(S.despesas ||[]).reduce((a,d)=>a+(+d.valor||0),0);
 const somaAportes  =()=>(S.aportes  ||[]).reduce((a,p)=>a+(+p.valor||0),0);
+const somaDiv=soc=>(S.dividendos||[]).filter(d=>!soc||d.socio===soc).reduce((a,d)=>a+(+d.valor||0),0);
 /* despesas marcadas para rateio (frete da mercadoria) divididas pelas peças compradas */
 function freteUnit(){
   const q=S.movs.filter(m=>m.tipo==='ENTRADA').reduce((a,m)=>a+m.qtd,0);
@@ -698,15 +737,15 @@ function noCartao(preco,n){
 }
 
 function calc(p){
-  const aquis=(+p.custo||0)+(+p.extra||0)+freteUnit();
-  const mat=matUnit();
-  const total=aquis+mat;
+  const aquis=(+p.custo||0)+(+p.extra||0)+freteUnit();   /* custo da peça: base do preço */
+  const mat=matUnit();                                   /* embalagem: sai do lucro, não do preço */
+  const total=aquis+mat;                                 /* custo cheio, usado só no lucro */
   const mult=multDe(p.cat);
   const arred=+S.cfg.arred||10, term=+S.cfg.term||0;
-  const sug=total>0?Math.max(0,Math.round(total*mult/arred)*arred-term):0;
+  const sug=aquis>0?Math.max(0,Math.round(aquis*mult/arred)*arred-term):0;
   const preco=(p.precoManual!=null&&p.precoManual!=='')?+p.precoManual:sug;
   return {aquis:aquis,mat:mat,total:total,mult:mult,sugerido:sug,preco:preco,
-          multEf:total>0?preco/total:0,lucro:lucroDe(preco,total)};
+          multEf:aquis>0?preco/aquis:0,lucro:lucroDe(preco,total)};
 }
 function lucroDe(preco,custoTotal){
   const prov=preco*(((+S.cfg.perda||0)+(+S.cfg.imposto||0))/100);
@@ -742,8 +781,11 @@ function totais(){
   const aporte=somaAportes();
   const gastoMat=somaMateriais(), gastoDesp=somaDespesas();
   const sam=lucro*((+S.cfg.splitSam||0)/100), cun=lucro*((+S.cfg.splitCun||0)/100);
-  /* caixa de verdade: tudo que entrou menos tudo que saiu */
-  const caixa=aporte+caixaVendas-aporteMerc-gastoMat-gastoDesp-Math.max(0,cun);
+  /* direito acumulado de cada sócio x o que de fato já foi retirado */
+  const divSam=somaDiv('Samuel'), divSara=somaDiv('Sara'), divTotal=somaDiv();
+  const saldoSam=sam-divSam, saldoSara=cun-divSara;
+  /* caixa de verdade: só sai o que foi efetivamente distribuído */
+  const caixa=aporte+caixaVendas-aporteMerc-gastoMat-gastoDesp-divTotal;
   let estQ=0,estCusto=0,estVenda=0,potLucro=0;
   S.pecas.forEach(p=>{
     const q=estoqueDe(p.id); if(q<=0)return;
@@ -758,6 +800,7 @@ function totais(){
   return {compradas,vendidas,permutadas,perdidas,aporte,receita,lucro,sam,cun,caixa,
           estQ,estCusto,estVenda,potLucro,precoMedio,lucroMedio,porPeca,permCusto,
           gastoMat,gastoDesp,gastoPecas:aporteMerc,investido,matUnit:mat,
+          divSam,divSara,divTotal,saldoSam,saldoSara,
           faltam:Math.max(0,Math.ceil(investido/porPeca)-vendidas)};
 }
 
@@ -768,7 +811,7 @@ function ir(t){
     document.getElementById('pg-'+x).classList.toggle('hide',x!==t);
     document.getElementById('nv-'+x).classList.toggle('on',x===t);
   });
-  window.scrollTo({top:0});
+  window.scrollTo({top:0}); toast('');
   if(t==='painel')renderPainel();
   if(t==='estoque')renderEstoque();
   if(t==='movs')renderMovs();
@@ -785,7 +828,7 @@ function renderPainel(){
   g('k-valor',R0(T.estVenda));
   g('k-c-aporte','+ '+R$(T.aporte)); g('k-c-vendas','+ '+R$(T.receita));
   g('k-c-pecas','− '+R$(T.gastoPecas)); g('k-c-mat','− '+R$(T.gastoMat));
-  g('k-c-desp','− '+R$(T.gastoDesp)); g('k-c-ret','− '+R$(Math.max(0,T.cun)));
+  g('k-c-desp','− '+R$(T.gastoDesp)); g('k-c-ret','− '+R$(T.divTotal));
   g('k-c-saldo',R$(T.caixa));
   document.getElementById('k-c-saldo').className=T.caixa<0?'v-verm':'';
   g('k-aporte',R$(T.investido)); g('k-recup',R$(T.caixa));
@@ -793,7 +836,10 @@ function renderPainel(){
   document.getElementById('k-bar').style.width=pct.toFixed(1)+'%';
   g('k-faltam',T.faltam+' peça'+(T.faltam===1?'':'s'));
   g('k-porpeca',R$(T.porPeca));
-  g('k-sam',R0(T.sam)); g('k-cun',R0(T.cun));
+  g('k-lucro2',R$(T.lucro));
+  g('k-sam',R$(T.sam)); g('k-sam-pago',R$(T.divSam)); g('k-sam-saldo',R$(T.saldoSam));
+  g('k-cun',R$(T.cun)); g('k-sara-pago',R$(T.divSara)); g('k-sara-saldo',R$(T.saldoSara));
+  g('k-div-total',R$(T.divTotal));
   g('k-p-rec',R$(T.estVenda)); g('k-p-luc',R$(T.potLucro));
   g('k-p-soc',R$(T.potLucro*((+S.cfg.splitSam||0)/100)));
   g('k-perm-q',T.permutadas); g('k-perm-v',R$(T.permCusto));
@@ -939,10 +985,11 @@ function desenharSaida(){
       <div class="lin"><span>Você recebe (preço da peça)</span><b>${R$(preco)}</b></div>
       ${acre>0?`<div class="lin"><span>Taxa do cartão em ${x.parc}x (${cart.taxa}%)</span><b>${R$(acre)}</b></div>`:''}
       <div class="lin tot"><span>${x.pgto==='Cartão'?'Cliente paga '+x.parc+'x de '+R$(parcela)+' =':'Cliente paga'}</span><b>${R$(recebido)}</b></div>
-      <div class="lin" style="margin-top:8px"><span>Custo da peça</span><b>− ${R$(c.total)}</b></div>
+      <div class="lin" style="margin-top:8px"><span>Custo da peça</span><b>− ${R$(c.aquis)}</b></div>
+      ${c.mat>0?`<div class="lin"><span>Embalagem</span><b>− ${R$(c.mat)}</b></div>`:''}
       <div class="lin"><span>Provisão perda/imposto</span><b>− ${R$(preco*(((+S.cfg.perda||0)+(+S.cfg.imposto||0))/100))}</b></div>
       <div class="lin"><span>Lucro da venda</span><b class="${lucro>=0?'v-verde':'v-verm'}">${R$(lucro)}</b></div>
-      <div class="lin"><span>Samuel ${S.cfg.splitSam}% / Cunhada ${S.cfg.splitCun}%</span><b>${R$(sam)} / ${R$(cun)}</b></div>
+      <div class="lin"><span>Samuel ${S.cfg.splitSam}% / Sara ${S.cfg.splitCun}%</span><b>${R$(sam)} / ${R$(cun)}</b></div>
     </div>
 
     <div class="frow">
@@ -996,7 +1043,7 @@ function editarPeca(pid){
 /* =====================================================================
    LANÇAMENTOS — material, despesa e aporte
    ===================================================================== */
-const FORMS=['menu','peca','material','despesa','aporte'];
+const FORMS=['menu','peca','material','despesa','aporte','dividendo'];
 function abrirForm(qual){
   FORMS.forEach(f=>{
     const el=document.getElementById(f==='menu'?'nv-menu':'nv-'+f);
@@ -1006,6 +1053,7 @@ function abrirForm(qual){
   if(qual==='material'){ document.getElementById('mt-data').value=hoje(); previewMaterial(); listarMateriais(); }
   if(qual==='despesa'){ document.getElementById('dp-data').value=hoje(); listarDespesas(); }
   if(qual==='aporte'){ document.getElementById('ap-data').value=hoje(); listarAportes(); }
+  if(qual==='dividendo'){ document.getElementById('dv-data').value=hoje(); previewDividendo(); listarDividendos(); }
   if(qual==='peca'){ prepararCadastro(); }
 }
 function voltarMenu(){ abrirForm('menu'); }
@@ -1028,7 +1076,8 @@ function previewMaterial(){
     (atual?'<div class="lin"><span>Já comprados deste tipo</span><b>'+atual.qtd+' un · '+R$(atual.valor)+'</b></div>':'')+
     '<div class="lin"><span>Material por peça — hoje</span><b>'+R$(matUnit())+'</b></div>'+
     '<div class="lin tot"><span>Material por peça — depois</span><b>'+R$(depois)+'</b></div>'+
-    '<div class="lin"><span>Sai do caixa</span><b class="v-verm">− '+R$(v)+'</b></div>';
+    '<div class="lin"><span>Sai do caixa agora</span><b class="v-verm">− '+R$(v)+'</b></div>'+
+    '<div class="lin"><span>Desconta do lucro de cada venda</span><b class="v-verm">− '+R$(depois)+'</b></div>';
 }
 function salvarMaterial(){
   const q=num('mt-qtd'), v=num('mt-valor');
@@ -1039,7 +1088,7 @@ function salvarMaterial(){
   salvar();
   ['mt-qtd','mt-valor','mt-forn','mt-outro'].forEach(i=>document.getElementById(i).value='');
   previewMaterial(); listarMateriais();
-  toast('Compra registrada · material por peça agora é '+R$(matUnit()));
+  toast('Compra registrada · '+R$(matUnit())+' por peça sai do lucro');
 }
 function listarMateriais(){
   const el=document.getElementById('mt-lista'); if(!el)return;
@@ -1118,6 +1167,63 @@ function apagarAporte(id){
   S.aportes=S.aportes.filter(a=>a.id!==id); salvar(); listarAportes(); toast('Aporte excluído');
 }
 
+/* ---------- distribuição de lucro ---------- */
+let socioSel='Samuel';
+function escolherSocio(s){
+  socioSel=s;
+  document.getElementById('dv-b-samuel').className=(s==='Samuel'?'on':'');
+  document.getElementById('dv-b-sara').className=(s==='Sara'?'on':'');
+  previewDividendo();
+}
+function previewDividendo(){
+  const T=totais();
+  const saldo=socioSel==='Samuel'?T.saldoSam:T.saldoSara;
+  const dir=socioSel==='Samuel'?T.sam:T.cun;
+  const pago=socioSel==='Samuel'?T.divSam:T.divSara;
+  const el=document.getElementById('dv-saldos'); if(!el)return;
+  el.innerHTML=
+    '<div class="lin"><span>Lucro acumulado do negócio</span><b>'+R$(T.lucro)+'</b></div>'+
+    '<div class="lin"><span>Direito de '+socioSel+' ('+(socioSel==='Samuel'?S.cfg.splitSam:S.cfg.splitCun)+'%)</span><b>'+R$(dir)+'</b></div>'+
+    '<div class="lin"><span>Já retirado</span><b>'+R$(pago)+'</b></div>'+
+    '<div class="lin tot"><span>Disponível para '+socioSel+'</span><b class="'+(saldo>=0?'v-ouro':'v-verm')+'">'+R$(saldo)+'</b></div>'+
+    '<div class="lin"><span>Saldo em caixa</span><b class="'+(T.caixa>0?'':'v-verm')+'">'+R$(T.caixa)+'</b></div>';
+  const v=num('dv-valor'), al=document.getElementById('dv-alerta');
+  let aviso='';
+  if(v>saldo+0.005)aviso='Essa retirada passa do que '+socioSel+' tem a receber ('+R$(saldo)+'). O saldo dele(a) fica negativo.';
+  else if(v>T.caixa+0.005)aviso='O caixa tem '+R$(T.caixa)+'. Retirar '+R$(v)+' deixa o caixa negativo.';
+  al.innerHTML=aviso?'<div class="aviso" style="margin:0 0 12px">'+esc(aviso)+'</div>':'';
+}
+function salvarDividendo(){
+  const v=num('dv-valor');
+  if(v<=0){toast('Informe o valor retirado');return;}
+  S.dividendos.push({id:'dv'+Date.now(),data:document.getElementById('dv-data').value||hoje(),
+    socio:socioSel,valor:v,obs:document.getElementById('dv-obs').value.trim()});
+  salvar();
+  document.getElementById('dv-valor').value=''; document.getElementById('dv-obs').value='';
+  previewDividendo(); listarDividendos();
+  toast('Retirada de '+socioSel+' registrada');
+}
+function listarDividendos(){
+  const el=document.getElementById('dv-lista'); if(!el)return;
+  const T=totais();
+  const L=(S.dividendos||[]).slice().sort((a,b)=>(b.data+b.id).localeCompare(a.data+a.id));
+  const topo='<div class="lin"><span>Samuel — retirado</span><b>'+R$(T.divSam)+'</b></div>'+
+             '<div class="lin"><span>Sara — retirado</span><b>'+R$(T.divSara)+'</b></div>'+
+             '<div class="lin tot"><span>Total distribuído</span><b>'+R$(T.divTotal)+'</b></div>'+
+             '<div style="height:12px"></div>';
+  if(!L.length){el.innerHTML=topo+'<div class="vazio" style="padding:22px"><div class="em">&#9878;</div>Nenhuma retirada ainda.</div>';return;}
+  el.innerHTML=topo+L.map(d=>'<div class="mov">'+
+      '<div class="mov-ic i-permuta">&#9878;</div>'+
+      '<div class="mov-c"><b>'+esc(d.socio)+'</b><small>'+dataBR(d.data)+(d.obs?' · '+esc(d.obs):'')+'</small></div>'+
+      '<div class="mov-v v-verm">− '+R$(d.valor)+
+        '<br><button class="btn gho" style="padding:2px 7px;font-size:11px;margin-top:4px" onclick="apagarDividendo(\''+d.id+'\')">excluir</button></div>'+
+    '</div>').join('');
+}
+function apagarDividendo(id){
+  if(!confirm('Excluir esta retirada? O valor volta para o caixa.'))return;
+  S.dividendos=S.dividendos.filter(d=>d.id!==id); salvar(); listarDividendos(); previewDividendo(); toast('Retirada excluída');
+}
+
 /* ---------------- cadastro de peça ---------------- */
 let editandoId=null;
 function prepararCadastro(){
@@ -1135,13 +1241,14 @@ function previewPreco(){
   const c=calc(fake);
   document.getElementById('n-resumo').innerHTML=`
     <div class="lin"><span>Custo da peça</span><b>${R$(custo)}</b></div>
-    <div class="lin"><span>+ material de embalagem</span><b>${R$(c.mat)}</b></div>
     ${freteUnit()>0?`<div class="lin"><span>+ frete rateado</span><b>${R$(freteUnit())}</b></div>`:''}
-    <div class="lin"><span>= custo total</span><b>${R$(c.total)}</b></div>
     <div class="lin tot"><span>Preço de venda (${c.multEf.toFixed(2)}x)</span><b>${R$(c.preco)}</b></div>
     <div class="lin"><span>Cartão 1x — cliente paga</span><b>${R$(noCartao(c.preco,1).total)}</b></div>
     <div class="lin"><span>Cartão ${S.cfg.maxParc}x — cliente paga</span><b>${R$(noCartao(c.preco,+S.cfg.maxParc||3).total)}</b></div>
-    <div class="lin"><span>Lucro por peça</span><b class="${c.lucro>=0?'v-verde':'v-verm'}">${R$(c.lucro)}</b></div>`;
+    <div class="lin" style="margin-top:8px"><span>− custo da peça</span><b>${R$(c.aquis)}</b></div>
+    <div class="lin"><span>− embalagem</span><b>${R$(c.mat)}</b></div>
+    <div class="lin"><span>− provisão perda/imposto</span><b>${R$(c.preco*(((+S.cfg.perda||0)+(+S.cfg.imposto||0))/100))}</b></div>
+    <div class="lin tot"><span>Lucro por peça</span><b class="${c.lucro>=0?'v-verde':'v-verm'}">${R$(c.lucro)}</b></div>`;
 }
 function salvarPeca(){
   const nome=document.getElementById('n-nome').value.trim();
@@ -1174,15 +1281,16 @@ function limparCadastro(){
 
 /* ---------------- movimentos ---------------- */
 function renderMovs(){
-  const tipos=['Tudo','SAÍDA','ENTRADA','MATERIAL','DESPESA','APORTE','PERMUTA','PERDA','DEVOLUÇÃO'];
-  const rot={'SAÍDA':'Vendas','ENTRADA':'Peças','MATERIAL':'Material','DESPESA':'Despesas','APORTE':'Aportes'};
+  const tipos=['Tudo','SAÍDA','ENTRADA','MATERIAL','DESPESA','APORTE','DIVIDENDO','PERMUTA','PERDA','DEVOLUÇÃO'];
+  const rot={'SAÍDA':'Vendas','ENTRADA':'Peças','MATERIAL':'Material','DESPESA':'Despesas','APORTE':'Aportes','DIVIDENDO':'Retiradas'};
   document.getElementById('chips-mov').innerHTML=tipos.map(t=>
     `<button class="chip ${t===filtroMov?'on':''}" onclick="filtroMov='${t}';renderMovs()">${rot[t]||t}</button>`).join('');
 
   /* junta tudo que mexe no caixa numa linha do tempo só */
   const ic={'SAÍDA':['&#8599;','i-venda'],'ENTRADA':['&#8600;','i-entrada'],'PERMUTA':['&#9733;','i-permuta'],
             'PERDA':['&#9888;','i-perda'],'DEVOLUÇÃO':['&#8630;','i-entrada'],
-            'MATERIAL':['&#9873;','i-entrada'],'DESPESA':['&#8599;','i-perda'],'APORTE':['&#8600;','i-venda']};
+            'MATERIAL':['&#9873;','i-entrada'],'DESPESA':['&#8599;','i-perda'],'APORTE':['&#8600;','i-venda'],
+            'DIVIDENDO':['&#9878;','i-permuta']};
   let L=[];
   S.movs.forEach(m=>{
     const p=peca(m.pecaId), c=p?calc(p):null;
@@ -1209,6 +1317,9 @@ function renderMovs(){
     val:'− '+R$(d.valor),cls:'v-verm',del:"apagarDespesa('"+d.id+"')"}));
   (S.aportes||[]).forEach(a=>L.push({tipo:'APORTE',data:a.data,id:a.id,titulo:a.desc,
     sub:dataBR(a.data),val:'+ '+R$(a.valor),cls:'v-verde',del:"apagarAporte('"+a.id+"')"}));
+  (S.dividendos||[]).forEach(d=>L.push({tipo:'DIVIDENDO',data:d.data,id:d.id,
+    titulo:'Retirada · '+d.socio,sub:dataBR(d.data)+(d.obs?' · '+d.obs:''),
+    val:'− '+R$(d.valor),cls:'v-verm',del:"apagarDividendo('"+d.id+"')"}));
 
   L=L.filter(x=>filtroMov==='Tudo'||x.tipo===filtroMov)
      .sort((a,b)=>(b.data+b.id).localeCompare(a.data+a.id));
@@ -1285,7 +1396,7 @@ function exportar(){
   toast('Backup baixado');
 }
 function exportarCSV(){
-  const h=['Data','Tipo','Codigo','Produto','Tam','Qtde','PrecoRecebido','Pagamento','Taxa%','Parcelas','ClientePagou','Custo','Lucro','Samuel','Cunhada','Cliente','Origem','Obs'];
+  const h=['Data','Tipo','Codigo','Produto','Tam','Qtde','PrecoRecebido','Pagamento','Taxa%','Parcelas','ClientePagou','Custo','Lucro','Samuel','Sara','Cliente','Origem','Obs'];
   const lin=S.movs.slice().sort((a,b)=>a.data.localeCompare(b.data)).map(m=>{
     const p=peca(m.pecaId); const c=p?calc(p):{total:0,aquis:0};
     let lucro=0;
@@ -1319,6 +1430,7 @@ function importar(ev){
       S.cfg.gdClientId=gId||S.cfg.gdClientId; S.cfg.gdArquivo=gArq||S.cfg.gdArquivo; S.cfg.gdAuto=gAuto;
       S.pecas=d.pecas; S.movs=d.movs;
       S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
+      S.dividendos=d.dividendos||[];
       salvar();
       fechar('ov-bk'); ir('painel'); toast('Backup restaurado');
     }catch(err){toast('Arquivo inválido');}
@@ -1517,6 +1629,7 @@ async function gdRestaurar(auto){
     S.cfg.gdClientId=guardaId; S.cfg.gdArquivo=guardaArq; S.cfg.gdAuto=guardaAuto;
     S.pecas=d.pecas; S.movs=d.movs;
     S.materiais=d.materiais||[]; S.despesas=d.despesas||[]; S.aportes=d.aportes||aportesDosLotes();
+    S.dividendos=d.dividendos||[];
     try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){}
     gdStatus(); ir('painel'); toast('Dados restaurados do Drive');
   }catch(e){ gdStatus(e.message,'erro'); toast('Falha ao restaurar'); }
