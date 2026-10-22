@@ -488,6 +488,14 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <button class="btn pri full" onclick="salvarPeca()">Cadastrar no estoque</button>
     </div>
     <div class="aviso">A peça entra no estoque e o valor pago sai do caixa.</div>
+
+    <div class="sec"><h2>Lote inteiro de uma vez</h2></div>
+    <div class="card">
+      <button class="btn full" onclick="document.getElementById('impLote').click()">Importar lote (.json)</button>
+      <input type="file" id="impLote" accept=".json,application/json" class="hide" onchange="importarLote(event)">
+      <div class="dica" style="margin-top:9px">Manda a foto da nota no chat do Claude e pede o arquivo do lote.
+      Ele <b>soma</b> ao estoque — nada do que já está aqui é apagado.</div>
+    </div>
     </div>
   </div>
 
@@ -566,6 +574,8 @@ nav button.add.on .ic{background:var(--ouro-claro)}
     <div class="card">
       <button class="btn full" style="margin-bottom:9px" onclick="exportar()">Baixar backup (.json)</button>
       <button class="btn full" style="margin-bottom:9px" onclick="exportarCSV()">Exportar movimentos (.csv)</button>
+      <button class="btn full" style="margin-bottom:9px" onclick="document.getElementById('impLote2').click()">Importar lote (.json)</button>
+      <input type="file" id="impLote2" accept=".json,application/json" class="hide" onchange="importarLote(event)">
       <button class="btn full" style="margin-bottom:9px" onclick="document.getElementById('imp').click()">Restaurar backup</button>
       <input type="file" id="imp" accept=".json" class="hide" onchange="importar(event)">
       <button class="btn dan full" onclick="zerar()">Apagar tudo e recomeçar</button>
@@ -1552,6 +1562,94 @@ function importar(ev){
   };
   r.readAsText(f); ev.target.value='';
 }
+/* =====================================================================
+   IMPORTAR LOTE — arquivo gerado a partir da foto da nota fiscal.
+   SOMA ao que já existe. Nunca apaga nada.
+   ===================================================================== */
+const CATS_VALIDAS=['Conjunto Calça','Conjunto Short','Conjunto Pedal','Macaquinho',
+  'Calça','Casaco','Colete','Regata','Top','Outros'];
+
+function importarLote(ev){
+  const f=ev.target.files[0]; ev.target.value=''; if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    let d; try{ d=JSON.parse(e.target.result); }catch(err){ toast('Arquivo não é um JSON válido'); return; }
+    aplicarLote(d);
+  };
+  r.readAsText(f);
+}
+
+function aplicarLote(d){
+  if(!d||typeof d!=='object'||!Array.isArray(d.pecas)||!d.pecas.length){
+    toast('Arquivo de lote inválido — falta a lista de peças'); return;
+  }
+  const pedido=String(d.pedido||'').trim();
+  const data=/^\d{4}-\d{2}-\d{2}$/.test(String(d.data||''))?d.data:hoje();
+  const forn=String(d.fornecedor||'').trim()||'—';
+
+  /* peças, com valores já conferidos */
+  const itens=[]; const problemas=[];
+  d.pecas.forEach((p,i)=>{
+    const nome=String(p.nome||'').trim();
+    const custo=+p.custo;
+    const qtd=Math.max(1,parseInt(p.qtd)||1);
+    if(!nome){ problemas.push('peça '+(i+1)+': sem nome'); return; }
+    if(!(custo>0)){ problemas.push(nome+': custo inválido'); return; }
+    const cat=CATS_VALIDAS.indexOf(String(p.cat||''))>=0?p.cat:'Outros';
+    itens.push({nome:nome,cat:cat,tam:String(p.tam||'Único').trim()||'Único',
+      cor:String(p.cor||'').trim(),custo:custo,qtd:qtd,
+      cod:String(p.cod||'').trim(),catOrig:String(p.cat||'')});
+  });
+  if(!itens.length){ toast('Nenhuma peça aproveitável no arquivo'); return; }
+
+  const totalPecas=itens.reduce((s,x)=>s+x.qtd,0);
+  const totalValor=itens.reduce((s,x)=>s+x.custo*x.qtd,0);
+  const aportes=(Array.isArray(d.aportes)?d.aportes:[]).filter(a=>+a.valor>0);
+  const materiais=(Array.isArray(d.materiais)?d.materiais:[]).filter(m=>+m.valor>0&&+m.qtd>0);
+
+  /* já importado? confere pelo número do pedido */
+  const jaTem=pedido&&S.pecas.some(p=>String(p.lote||'')===pedido);
+
+  let aviso='';
+  if(jaTem)aviso='\n\nATENÇÃO: já existem peças do pedido '+pedido+' cadastradas. '+
+                 'Continuar vai DUPLICAR. Cancele se não for isso.';
+  const semCat=itens.filter(x=>x.catOrig&&x.catOrig!==x.cat);
+  if(semCat.length)aviso+='\n\nCategoria não reconhecida (entrou como Outros): '+
+                          semCat.map(x=>x.nome).join(', ');
+  if(problemas.length)aviso+='\n\nIgnoradas: '+problemas.join('; ');
+
+  const resumo='Importar lote'+(pedido?' '+pedido:'')+'?\n\n'+
+    totalPecas+' peça(s) · '+R$(totalValor)+'\n'+
+    dataBR(data)+' · '+forn+
+    (aportes.length?'\n'+aportes.length+' aporte(s) · '+R$(aportes.reduce((s,a)=>s+ +a.valor,0)):'')+
+    (materiais.length?'\n'+materiais.length+' compra(s) de material':'')+
+    aviso;
+  if(!confirm(resumo))return;
+
+  /* grava */
+  let n=Date.now();
+  itens.forEach(x=>{
+    const id='p'+(n++);
+    S.pecas.push({id:id,cod:x.cod||String(n).slice(-5),nome:x.nome,cat:x.cat,tam:x.tam,
+      cor:x.cor,custo:x.custo,extra:0,lote:pedido,precoManual:null,criado:data});
+    S.movs.push({id:'m'+(n++),data:data,tipo:'ENTRADA',pecaId:id,qtd:x.qtd,valor:x.custo,
+      pgto:String(d.pgto||'—'),taxa:0,parc:1,cliente:forn,origem:'—',
+      obs:pedido?'Pedido '+pedido:'Lote importado'});
+  });
+  aportes.forEach(a=>{
+    S.aportes.push({id:'ap'+(n++),data:/^\d{4}-\d{2}-\d{2}$/.test(String(a.data||''))?a.data:data,
+      desc:String(a.desc||'').trim()||'Aporte do lote'+(pedido?' '+pedido:''),valor:+a.valor});
+  });
+  materiais.forEach(m=>{
+    S.materiais.push({id:'mt'+(n++),data:/^\d{4}-\d{2}-\d{2}$/.test(String(m.data||''))?m.data:data,
+      tipo:String(m.tipo||m.desc||'Material').trim(),qtd:+m.qtd,valor:+m.valor,
+      forn:String(m.forn||'').trim()});
+  });
+
+  salvar(); ir('estoque');
+  toast(totalPecas+' peça(s) importada(s)'+(pedido?' · pedido '+pedido:''));
+}
+
 function zerar(){
   if(!confirm('Apagar TODOS os dados e voltar aos 2 lotes originais?'))return;
   if(!confirm('Tem certeza? Faça um backup antes.'))return;
