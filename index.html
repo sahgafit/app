@@ -7,6 +7,9 @@
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <meta name="referrer" content="no-referrer">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="SAHGA">
@@ -240,6 +243,13 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 .opt b{display:block;font-size:14.5px;font-weight:600;margin-bottom:2px}
 .opt small{display:block;font-size:11.5px;color:var(--texto2);line-height:1.35}
 
+#atualiza{
+  background:linear-gradient(160deg,#171207,#111);border:1px solid var(--ouro-fraco);
+  border-radius:12px;padding:13px 15px;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap
+}
+#atualiza .txt{flex:1;min-width:150px;font-size:13px;color:var(--ouro-claro);line-height:1.35}
+#atualiza .txt small{display:block;color:var(--texto2);font-size:11.5px;margin-top:2px}
 #msg{
   background:var(--grafite);border:1px solid var(--ouro-fraco);border-left:3px solid var(--ouro);
   border-radius:11px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;color:var(--ouro-claro)
@@ -268,6 +278,7 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 </header>
 
 <main>
+  <div id="atualiza" class="hide"></div>
   <div id="msg" class="hide"></div>
   <!-- ============ PAINEL ============ -->
   <div class="page" id="pg-painel">
@@ -601,6 +612,9 @@ nav button.add.on .ic{background:var(--ouro-claro)}
    Dados salvos no navegador (localStorage). Backup em JSON.
    ===================================================================== */
 const KEY='sahga_v3';
+/* Versão desta cópia. O app instalado não recarrega sozinho ao abrir — ele retoma
+   da memória. Então ele mesmo confere se há versão nova publicada e avisa. */
+const APP_VERSAO='2026-10-22-13h';
 
 const CFG_PADRAO={
   material:{tag:0,sacola:0,adesivo:0,cartaog:0,outros:0},
@@ -1851,9 +1865,44 @@ function cobAdiar(){
 }
 function cobPular(){ cobIdx++; desenharCobranca(); }
 
+/* =====================================================================
+   ATUALIZAÇÃO — o app instalado fica em memória e não recarrega sozinho.
+   Aqui ele busca o index.html publicado e compara a versão.
+   ===================================================================== */
+let versaoNovaVista=false;
+async function checarVersao(){
+  if(versaoNovaVista)return;
+  try{
+    const r=await fetch('index.html?v='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return;
+    const txt=await r.text();
+    const m=txt.match(/APP_VERSAO='([^']+)'/);
+    if(m&&m[1]&&m[1]!==APP_VERSAO){ versaoNovaVista=true; avisarVersao(m[1]); }
+  }catch(e){}                                   /* sem internet: ignora */
+}
+function avisarVersao(nova){
+  const el=document.getElementById('atualiza'); if(!el)return;
+  el.innerHTML='<div class="txt">Há uma versão nova do app'+
+    '<small>Esta: '+esc(APP_VERSAO)+' · publicada: '+esc(nova)+'</small></div>'+
+    '<button class="btn pri" style="padding:9px 14px;font-size:13px" onclick="atualizarApp()">Atualizar</button>';
+  el.classList.remove('hide');
+}
+function atualizarApp(){
+  /* envia o que estiver pendente antes de recarregar, para não perder nada */
+  const seguir=()=>location.replace(location.pathname+'?v='+Date.now());
+  if(typeof gdConectado==='function'&&gdConectado()){
+    toast('Salvando no Drive antes de atualizar...');
+    gdSalvar(false).then(seguir).catch(seguir);
+    setTimeout(seguir,6000);                    /* não trava se o Drive demorar */
+  }else seguir();
+}
+/* confere ao abrir e sempre que o app volta do segundo plano */
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden)checarVersao(); });
+
 /* ---------------- início ---------------- */
 carregar(); prepararCadastro(); ir('painel'); gdAutoConectar();
 setTimeout(abrirCobrancas,900);   /* lembrete de pagamentos previstos para hoje */
+setTimeout(checarVersao,2500);    /* avisa se há versão nova publicada */
 </script>
 </body>
 </html>
