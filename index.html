@@ -495,6 +495,9 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <input type="file" id="impLote" accept=".json,application/json" class="hide" onchange="importarLote(event)">
       <div class="dica" style="margin-top:9px">Manda a foto da nota no chat do Claude e pede o arquivo do lote.
       Ele <b>soma</b> ao estoque — nada do que já está aqui é apagado.</div>
+      <button class="btn dan full" style="margin-top:11px" onclick="desfazerLote()">Desfazer um lote</button>
+      <div class="dica" style="margin-top:7px">Apaga as peças e os lançamentos de um número de pedido.
+      Peça já vendida é preservada.</div>
     </div>
     </div>
   </div>
@@ -1648,6 +1651,39 @@ function aplicarLote(d){
 
   salvar(); ir('estoque');
   toast(totalPecas+' peça(s) importada(s)'+(pedido?' · pedido '+pedido:''));
+}
+
+/* desfaz um lote inteiro pelo numero do pedido — para corrigir importacao errada */
+function desfazerLote(){
+  const lotes={};
+  S.pecas.forEach(p=>{ const l=String(p.lote||'').trim(); if(l)lotes[l]=(lotes[l]||0)+1; });
+  const nomes=Object.keys(lotes).sort();
+  if(!nomes.length){ toast('Nenhuma peça tem número de pedido'); return; }
+  const ped=prompt('Qual pedido desfazer?\n\nCadastrados: '+
+    nomes.map(l=>l+' ('+lotes[l]+')').join(', '));
+  if(ped===null)return;
+  const alvo=String(ped).trim();
+  const pecas=S.pecas.filter(p=>String(p.lote||'').trim()===alvo);
+  if(!pecas.length){ toast('Nenhuma peça do pedido '+alvo); return; }
+
+  /* peca com venda, permuta, perda ou uso proprio fica — o historico importa mais */
+  const ids=pecas.map(p=>p.id);
+  const comHist=ids.filter(id=>S.movs.some(m=>m.pecaId===id&&m.tipo!=='ENTRADA'));
+  const limpas=ids.filter(id=>comHist.indexOf(id)<0);
+
+  const valor=S.movs.filter(m=>m.tipo==='ENTRADA'&&limpas.indexOf(m.pecaId)>=0)
+                    .reduce((s,m)=>s+m.valor*m.qtd,0);
+  let aviso='';
+  if(comHist.length)aviso='\n\n'+comHist.length+' peça(s) têm venda ou saída registrada e vão '+
+    'PERMANECER. Corrija o custo delas uma a uma no estoque.';
+
+  if(!confirm('Apagar '+limpas.length+' peça(s) do pedido '+alvo+'?\n\n'+
+      'Sai do caixa: '+R$(valor)+aviso))return;
+
+  S.pecas=S.pecas.filter(p=>limpas.indexOf(p.id)<0);
+  S.movs =S.movs.filter(m=>limpas.indexOf(m.pecaId)<0);
+  salvar(); ir('estoque');
+  toast(limpas.length+' peça(s) do pedido '+alvo+' apagada(s)');
 }
 
 function zerar(){
