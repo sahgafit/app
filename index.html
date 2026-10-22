@@ -936,7 +936,7 @@ function renderEstoque(){
 function abrirSaida(pid,tipo){
   const p=peca(pid); if(!p)return;
   const c=calc(p);
-  ctxSaida={pid:pid,tipo:tipo,preco:(tipo==='SÓCIO'?c.total:c.preco),pgto:'Pix',parc:1,qtd:1,socio:'Samuel',data:hoje()};
+  ctxSaida={pid:pid,tipo:tipo,preco:(tipo==='SÓCIO'?c.aquis:c.preco),pgto:'Pix',parc:1,qtd:1,socio:'Samuel',incEmb:false,data:hoje()};
   document.getElementById('s-peca').textContent=p.nome+' · '+p.tam+' · '+(p.cor||'');
   document.getElementById('ov-saida').classList.add('on');
   desenharSaida();
@@ -952,7 +952,7 @@ function desenharSaida(){
     box.innerHTML=`
       <button class="btn pri full" style="margin-bottom:9px" onclick="ctxSaida.tipo='SAÍDA';desenharSaida()">Vender</button>
       <button class="btn full" style="margin-bottom:9px" onclick="ctxSaida.tipo='PERMUTA';desenharSaida()">Dar para divulgação</button>
-      <button class="btn full" style="margin-bottom:9px" onclick="ctxSaida.tipo='SÓCIO';ctxSaida.preco=calc(peca(ctxSaida.pid)).total;desenharSaida()">Sócio levou a peça (paga o custo)</button>
+      <button class="btn full" style="margin-bottom:9px" onclick="ctxSaida.tipo='SÓCIO';ctxSaida.incEmb=false;ctxSaida.preco=calc(peca(ctxSaida.pid)).aquis;desenharSaida()">Sócio levou a peça (paga o custo)</button>
       <button class="btn full" style="margin-bottom:9px" onclick="ctxSaida.tipo='DEVOLUÇÃO';desenharSaida()">Devolução (voltou ao estoque)</button>
       <button class="btn dan full" style="margin-bottom:14px" onclick="ctxSaida.tipo='PERDA';desenharSaida()">Perda / dano</button>
       <button class="btn gho full" onclick="editarPeca('${x.pid}')">Editar dados da peça</button>`;
@@ -961,7 +961,9 @@ function desenharSaida(){
 
   /* ---- SÓCIO leva a peça pagando o custo ---- */
   if(x.tipo==='SÓCIO'){
-    const custo=c.total;
+    const incEmb=x.incEmb===true;                 /* padrão: leva a peça sem embalagem */
+    const custo=c.aquis+(incEmb?c.mat:0);
+    const valor=(x.preco!=null?x.preco:custo);
     box.innerHTML=`
       <div class="aviso">A peça sai do estoque e o sócio repõe o valor de custo no caixa.
         Não há lucro nem prejuízo — o dinheiro volta para comprar outra peça.</div>
@@ -970,18 +972,26 @@ function desenharSaida(){
           <button class="${x.socio!=='Sara'?'on':''}" onclick="ctxSaida.socio='Samuel';desenharSaida()">Samuel</button>
           <button class="${x.socio==='Sara'?'on':''}" onclick="ctxSaida.socio='Sara';desenharSaida()">Sara</button>
         </div></div>
+      ${c.mat>0?`<label style="display:flex;align-items:flex-start;gap:9px;font-size:13.5px;padding:2px 2px 12px">
+        <input type="checkbox" ${incEmb?'checked':''} style="width:18px;height:18px;accent-color:#C9A227;flex:0 0 auto;margin-top:1px"
+               onchange="ctxSaida.incEmb=this.checked;ctxSaida.preco=null;desenharSaida()">
+        <span>Incluir embalagem (${R$(c.mat)})<br>
+          <small style="color:var(--texto2);font-size:11.5px">Marque só se a peça sair com tag e sacola. Sem isso, a embalagem fica no estoque para outra venda.</small></span></label>`
+      :`<div class="dica" style="padding:0 2px 12px">Nenhum material de embalagem registrado ainda.</div>`}
       <div class="frow">
         <div class="f"><label>Valor reposto (R$)</label>
-          <input type="number" step="0.01" inputmode="decimal" id="s-valsocio" value="${custo.toFixed(2)}"
+          <input type="number" step="0.01" inputmode="decimal" id="s-valsocio" value="${valor.toFixed(2)}"
                  onchange="ctxSaida.preco=parseFloat(this.value)||0;desenharSaida()">
-          <div class="dica">Custo da peça: ${R$(c.aquis)} + embalagem ${R$(c.mat)}</div></div>
+          <div class="dica">Peça ${R$(c.aquis)}${incEmb?' + embalagem '+R$(c.mat):''}</div></div>
         <div class="f"><label>Data</label><input type="date" id="s-data" value="${hoje()}"></div>
       </div>
       <div class="f"><label>Observação</label><input id="s-obs" placeholder="opcional"></div>
       <div class="resumo">
         <div class="lin"><span>Preço de tabela da peça</span><b>${R$(c.preco)}</b></div>
-        <div class="lin"><span>Entra no caixa</span><b class="v-verde">+ ${R$(x.preco!=null?x.preco:custo)}</b></div>
-        <div class="lin tot"><span>Lucro gerado</span><b>${R$(0)}</b></div>
+        <div class="lin"><span>Custo da peça</span><b>${R$(c.aquis)}</b></div>
+        <div class="lin"><span>Embalagem</span><b>${incEmb?R$(c.mat):'não incluída'}</b></div>
+        <div class="lin tot"><span>Entra no caixa</span><b class="v-verde">+ ${R$(valor)}</b></div>
+        <div class="lin"><span>Lucro gerado</span><b>${R$(0)}</b></div>
         <div class="lin"><span>Samuel / Sara</span><b>${R$(0)} / ${R$(0)}</b></div>
       </div>
       <button class="btn pri full" onclick="confirmarSaida()">Confirmar retirada</button>`;
@@ -1090,7 +1100,7 @@ function confirmarSaida(){
   const gv=id=>{const e=document.getElementById(id);return e?e.value:'';};
   let valor=0;
   if(x.tipo==='SAÍDA')valor=x.preco;
-  else if(x.tipo==='SÓCIO')valor=parseFloat(gv('s-valsocio'))||calc(p).total;
+  else if(x.tipo==='SÓCIO')valor=parseFloat(gv('s-valsocio'))||(calc(p).aquis+(x.incEmb?calc(p).mat:0));
   else if(x.tipo==='DEVOLUÇÃO')valor=parseFloat(gv('s-valdev'))||calc(p).preco;
   const dataMov=gv('s-data')||hoje();
   const aPrazo=(x.tipo==='SAÍDA'&&dataMov>hoje());
@@ -1101,6 +1111,7 @@ function confirmarSaida(){
     taxa:(x.tipo==='SAÍDA'&&x.pgto==='Cartão')?taxaParc(x.parc):0,
     parc:(x.tipo==='SAÍDA'&&x.pgto==='Cartão')?x.parc:1,
     socio:x.tipo==='SÓCIO'?(x.socio||'Samuel'):undefined,
+    incEmb:x.tipo==='SÓCIO'?!!x.incEmb:undefined,
     cliente:x.tipo==='SÓCIO'?(x.socio||'Samuel'):gv('s-cliente'),
     origem:x.tipo==='PERMUTA'?'Permuta':(x.tipo==='SÓCIO'?'Sócio':(gv('s-origem')||'—')), obs:gv('s-obs')
   };
@@ -1392,7 +1403,7 @@ function renderMovs(){
     else {val='− '+R$(m.valor);cls='v-verm';}
     const det=[dataBR(m.data)];
     if(m.tipo==='SAÍDA')det.push(m.pgto+(m.pgto==='Cartão'?' '+m.parc+'x ('+m.taxa+'%)':''));
-    if(m.tipo==='SÓCIO')det.push('custo reposto · sem lucro');
+    if(m.tipo==='SÓCIO')det.push('custo reposto'+(m.incEmb?' com embalagem':'')+' · sem lucro');
     if(m.cliente)det.push(m.cliente);
     if(m.obs)det.push(m.obs);
     L.push({tipo:m.tipo,data:m.data,id:m.id,titulo:p?p.nome:'peça removida',
