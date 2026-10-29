@@ -299,6 +299,7 @@ nav button.add.on .ic{background:var(--ouro-claro)}
       <div class="lin"><span>(−) Compra de material</span><b id="k-c-mat">R$ 0</b></div>
       <div class="lin"><span>(−) Despesas</span><b id="k-c-desp">R$ 0</b></div>
       <div class="lin"><span>(+) Reposição de sócio</span><b class="v-verde" id="k-c-socio">R$ 0</b></div>
+      <div class="lin hide" id="k-l-taxas"><span>(−) Taxas de cartão absorvidas</span><b class="v-verm" id="k-c-taxas">R$ 0</b></div>
       <div class="lin"><span>(−) Distribuição de lucro</span><b id="k-c-ret">R$ 0</b></div>
       <div class="lin tot"><span>Saldo em caixa</span><b id="k-c-saldo">R$ 0</b></div>
     </div>
@@ -542,8 +543,13 @@ nav button.add.on .ic{background:var(--ouro-claro)}
         <option value="4">4x</option><option value="5">5x</option><option value="6">6x</option>
         <option value="10">10x</option><option value="12">12x</option></select></div>
       <div class="dica" style="font-size:11.5px;color:var(--texto2);margin-bottom:12px">
-        Taxas de <b>recebimento na hora</b>, faixa até R$ 3.000/mês. O preço da peça é o que
-        <b>você recebe</b>: o cliente paga preço ÷ (1 − taxa). Confira as suas no app do Mercado Pago.</div>
+        Taxas de <b>recebimento na hora</b>, faixa até R$ 3.000/mês.
+        Confira as suas no app do Mercado Pago — elas caem conforme o faturamento sobe.</div>
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;padding:6px 2px">
+        <input type="checkbox" id="c-absorve" onchange="salvarConfig()" style="width:18px;height:18px;accent-color:#C9A227">
+        Absorver a taxa do cartão por padrão</label>
+      <div class="dica" style="margin:0 0 12px 29px">Ligado, o cliente paga o preço de tabela e a taxa
+        sai do seu lucro. Desligado, a taxa é somada ao valor do cliente. Dá pra trocar em cada venda.</div>
       <div id="c-taxas"></div>
     </div>
 
@@ -554,6 +560,17 @@ nav button.add.on .ic{background:var(--ouro-claro)}
         <div class="f"><label>Sara (%)</label><input type="number" step="1" inputmode="numeric" id="c-cun" oninput="salvarConfig()"></div>
       </div>
       <div class="f"><label>Mínimo de vendas no mês p/ liberar permuta</label><input type="number" step="1" inputmode="numeric" id="c-permmin" oninput="salvarConfig()"></div>
+    </div>
+
+    <div class="sec"><h2>Preço de catálogo</h2></div>
+    <div class="card">
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;padding:6px 2px">
+        <input type="checkbox" id="c-alinhar" onchange="salvarConfig()" style="width:18px;height:18px;accent-color:#C9A227">
+        Peças com o mesmo nome valem o mesmo preço</label>
+      <div class="dica" style="margin:7px 0 0 29px">Ao cadastrar uma peça que já existe no estoque,
+        todas ficam com o <b>preço mais alto</b> entre elas. Comprou com desconto? O preço de catálogo
+        continua valendo. A peça nova saiu mais cara? Todas sobem.</div>
+      <button class="btn full" style="margin-top:11px" onclick="alinharTudo()">Alinhar todo o estoque agora</button>
     </div>
 
     <div class="sec"><h2>Google Drive</h2></div>
@@ -572,6 +589,12 @@ nav button.add.on .ic{background:var(--ouro-claro)}
         Salvar no Drive automaticamente a cada alteração</label>
       <button class="btn gho full" style="margin-top:9px" onclick="gdDesconectar()">Desconectar</button>
     </div>
+
+    <div class="sec"><h2>Revisar estoque</h2>
+      <button class="lnk" onclick="renderRevisao()">atualizar</button></div>
+    <div class="card" id="rev-corpo"></div>
+    <div class="dica" style="margin:7px 2px 0;font-size:11.5px;color:var(--texto2)">
+      Procura peça cadastrada sem entrada lançada e o mesmo produto escrito de formas diferentes.</div>
 
     <div class="sec"><h2>Dados</h2></div>
     <div class="card">
@@ -627,13 +650,13 @@ nav button.add.on .ic{background:var(--ouro-claro)}
 const KEY='sahga_v3';
 /* Versão desta cópia. O app instalado não recarrega sozinho ao abrir — ele retoma
    da memória. Então ele mesmo confere se há versão nova publicada e avisa. */
-const APP_VERSAO='2026-10-22-13h';
+const APP_VERSAO='2026-10-29-12h30';
 
 const CFG_PADRAO={
   material:{tag:0,sacola:0,adesivo:0,cartaog:0,outros:0},
   mult:{'Conjunto Calça':1.90,'Conjunto Short':1.90,'Conjunto Pedal':1.90,'Macaquinho':1.90,
         'Calça':1.90,'Casaco':2.00,'Colete':1.80,'Regata':1.80,'Top':1.80,'Outros':1.90},
-  arred:10, term:0.10, perda:6, imposto:0,
+  arred:10, term:0.10, alinharPreco:true, absorveTaxa:false, perda:6, imposto:0,
   /* taxas do Mercado Pago — recebimento NA HORA, faixa até R$ 3.000/mês.
      O lojista RECEBE o preço da peça; o cliente paga preço ÷ (1 − taxa). */
   taxasCartao:{1:5.00,2:9.90,3:11.28,4:12.64,5:13.97,6:15.27,
@@ -780,10 +803,41 @@ function T_EXEMPLO(){
   const v=S.pecas.map(p=>calc(p).preco).filter(x=>x>0);
   return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length/10)*10-0.10:99.90;
 }
-function noCartao(preco,n){
+/* absorve=false (padrão): o cliente paga a taxa, você recebe o preço cheio.
+   absorve=true: o cliente paga o preço de tabela e a taxa sai do seu lucro. */
+function noCartao(preco,n,absorve){
   const t=taxaParc(n)/100;
+  if(absorve){
+    const liq=(t>0&&t<1)?preco*(1-t):preco;
+    return {taxa:taxaParc(n),total:preco,parcela:preco/Math.max(1,n),
+            acrescimo:0,liquido:liq,custoTaxa:preco-liq,absorve:true};
+  }
   const total=(t>0&&t<1)?preco/(1-t):preco;
-  return {taxa:taxaParc(n),total:total,parcela:total/Math.max(1,n),acrescimo:total-preco};
+  return {taxa:taxaParc(n),total:total,parcela:total/Math.max(1,n),
+          acrescimo:total-preco,liquido:preco,custoTaxa:0,absorve:false};
+}
+/* quanto de fato entra no caixa por unidade vendida */
+function liquidoMov(m){
+  if(m.tipo!=='SAÍDA'||!m.absorve)return m.valor;
+  const t=(+m.taxa||0)/100;
+  return (t>0&&t<1)?m.valor*(1-t):m.valor;
+}
+
+/* ---------------------------------------------------------------------
+   PREÇO DE CATÁLOGO — peças com o mesmo nome valem o mesmo preço.
+   Recomprou com desconto? O preço de catálogo (mais alto) manda.
+   A peça nova saiu mais cara? Todas sobem.
+   --------------------------------------------------------------------- */
+function alinharPreco(nome){
+  if(!S.cfg.alinharPreco)return null;
+  const k=chaveNome(nome); if(!k)return null;
+  const iguais=S.pecas.filter(p=>chaveNome(p.nome)===k);
+  if(iguais.length<2)return null;
+  const maior=Math.max.apply(null,iguais.map(p=>calc(p).preco));
+  if(!(maior>0))return null;
+  let n=0;
+  iguais.forEach(p=>{ if(Math.abs(calc(p).preco-maior)>0.005){ p.precoManual=maior; n++; } });
+  return n?{preco:maior,ajustadas:n,total:iguais.length}:null;
 }
 
 function calc(p){
@@ -826,17 +880,19 @@ function cobrancasDoDia(){
 
 function totais(){
   const mat=matUnit();
-  let compradas=0,vendidas=0,permutadas=0,perdidas=0,socios=0,reposSocio=0,aporteMerc=0,receita=0,lucro=0,caixaVendas=0,aReceber=0,nReceber=0;
+  let compradas=0,vendidas=0,permutadas=0,perdidas=0,socios=0,reposSocio=0,aporteMerc=0,receita=0,lucro=0,caixaVendas=0,aReceber=0,nReceber=0,taxasAbs=0;
   S.movs.forEach(m=>{
     const p=peca(m.pecaId); if(!p)return;
     const c=calc(p);
     if(m.tipo==='ENTRADA'){compradas+=m.qtd;aporteMerc+=m.valor*m.qtd;}
     else if(m.tipo==='SAÍDA'){
-      vendidas+=m.qtd; receita+=m.valor*m.qtd;
-      lucro+=lucroDe(m.valor,c.total)*m.qtd;
+      const liq=liquidoMov(m);                 /* desconta a taxa que você absorveu */
+      vendidas+=m.qtd; receita+=liq*m.qtd;
+      taxasAbs+=(m.valor-liq)*m.qtd;
+      lucro+=lucroDe(liq,c.total)*m.qtd;
       /* data futura = venda a prazo: entra no caixa só quando confirmada como paga */
-      if(estaPago(m)) caixaVendas+=m.valor*m.qtd;
-      else { aReceber+=m.valor*m.qtd; nReceber+=m.qtd; }
+      if(estaPago(m)) caixaVendas+=liq*m.qtd;
+      else { aReceber+=liq*m.qtd; nReceber+=m.qtd; }
     }
     else if(m.tipo==='DEVOLUÇÃO'){
       vendidas-=m.qtd; receita-=m.valor*m.qtd; caixaVendas-=m.valor*m.qtd;
@@ -868,7 +924,7 @@ function totais(){
   const investido=aporteMerc+gastoMat+gastoDesp;   /* o que já foi aplicado no negócio */
   return {compradas,vendidas,permutadas,perdidas,aporte,receita,lucro,sam,cun,caixa,
           estQ,estCusto,estVenda,potLucro,precoMedio,lucroMedio,porPeca,permCusto,
-          gastoMat,gastoDesp,gastoPecas:aporteMerc,investido,matUnit:mat,socios,reposSocio,aReceber,nReceber,
+          gastoMat,gastoDesp,gastoPecas:aporteMerc,investido,matUnit:mat,socios,reposSocio,aReceber,nReceber,taxasAbs,
           divSam,divSara,divTotal,saldoSam,saldoSara,
           faltam:Math.max(0,Math.ceil(investido/porPeca)-vendidas)};
 }
@@ -900,6 +956,8 @@ function renderPainel(){
   document.getElementById('k-linha-receber').style.display=T.aReceber>0?'':'none';
   g('k-c-pecas','− '+R$(T.gastoPecas)); g('k-c-mat','− '+R$(T.gastoMat));
   g('k-c-desp','− '+R$(T.gastoDesp)); g('k-c-socio','+ '+R$(T.reposSocio)); g('k-c-ret','− '+R$(T.divTotal));
+  g('k-c-taxas','− '+R$(T.taxasAbs));
+  document.getElementById('k-l-taxas').classList.toggle('hide',!(T.taxasAbs>0));
   g('k-c-saldo',R$(T.caixa));
   document.getElementById('k-c-saldo').className=T.caixa<0?'v-verm':'';
   g('k-aporte',R$(T.investido)); g('k-recup',R$(T.caixa));
@@ -921,6 +979,89 @@ function renderPainel(){
 }
 
 /* ---------------- estoque ---------------- */
+/* =====================================================================
+   RASTREAMENTO — identidade e histórico de cada peça.
+   ===================================================================== */
+/* identificação curta, usada no estoque, nos movimentos e no histórico */
+const ficha=p=>[p.tam,(p.cor||'sem cor'),'cód. '+p.cod].filter(Boolean).join(' · ');
+
+/* nome normalizado, para achar a mesma peça escrita de formas diferentes.
+   "Colete Lily" e "Colete c/ Manga Lily" têm que cair no mesmo lugar. */
+const RUIDO=['conj','conjunto','c','com','s','sem','ref','de','da','do','e'];
+function palavrasNome(n){
+  return String(n||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9 ]+/g,' ').split(/\s+/)
+    .filter(w=>w&&RUIDO.indexOf(w)<0);
+}
+const chaveNome=n=>palavrasNome(n).join(' ');
+/* mesmo produto quando um nome é o outro mais detalhado:
+   {colete, lily} cabe dentro de {colete, manga, lily} */
+function mesmoProduto(a,b){
+  const A=palavrasNome(a), B=palavrasNome(b);
+  if(!A.length||!B.length)return false;
+  if(A.join(' ')===B.join(' '))return true;
+  const [men,mai]=A.length<=B.length?[A,B]:[B,A];
+  if(men.length<2)return false;                 /* nome curto demais: não arrisca */
+  return men.every(w=>mai.indexOf(w)>=0);
+}
+
+/* todos os lançamentos de uma peça, em ordem */
+function movsDaPeca(pid){
+  return S.movs.filter(m=>m.pecaId===pid)
+    .slice().sort((a,b)=>(a.data+a.id).localeCompare(b.data+b.id));
+}
+/* peça cadastrada que nunca teve entrada: não aparece em movimentos e fica como esgotada */
+const semEntrada=pid=>!S.movs.some(m=>m.pecaId===pid&&m.tipo==='ENTRADA');
+
+function historicoPeca(pid){
+  const p=peca(pid); if(!p)return;
+  const c=calc(p), L=movsDaPeca(pid), q=estoqueDe(pid);
+  const rot={'ENTRADA':'Entrou no estoque','SAÍDA':'Vendida','PERMUTA':'Divulgação',
+             'PERDA':'Perda','DEVOLUÇÃO':'Devolvida','SÓCIO':'Uso próprio'};
+  let entrou=0, saiu=0;
+  const linhas=L.map(m=>{
+    if(m.tipo==='ENTRADA'||m.tipo==='DEVOLUÇÃO')entrou+=m.qtd; else saiu+=m.qtd;
+    const det=[];
+    if(m.tipo==='SAÍDA'){
+      det.push(m.pgto+(m.pgto==='Cartão'?' '+m.parc+'x':''));
+      if(m.absorve)det.push('taxa absorvida · líquido '+R$(liquidoMov(m)));
+      if(m.cliente)det.push('para '+m.cliente);
+      if(m.pago===false)det.push('A RECEBER');
+    }
+    else if(m.tipo==='PERMUTA')det.push('para '+(m.cliente||'divulgação'));
+    else if(m.tipo==='SÓCIO')det.push((m.socio||m.cliente||'sócio')+' levou');
+    else if(m.tipo==='ENTRADA')det.push(m.cliente||'compra');
+    if(m.obs)det.push(m.obs);
+    const v=m.tipo==='PERMUTA'?c.total:(m.tipo==='PERDA'?c.aquis:m.valor);
+    return '<div class="lin" style="align-items:flex-start">'+
+      '<span style="flex:1"><b style="color:var(--texto)">'+(rot[m.tipo]||m.tipo)+'</b>'+
+      (m.qtd>1?' ×'+m.qtd:'')+'<br><small style="font-size:11px">'+esc(dataBR(m.data)+
+      (det.length?' · '+det.join(' · '):''))+'</small></span>'+
+      '<b class="'+(m.tipo==='ENTRADA'?'':'v-verde')+'">'+R$(v)+'</b></div>';
+  }).join('');
+
+  const alerta=semEntrada(pid)
+    ? '<div class="aviso">Esta peça foi cadastrada mas <b>nunca teve lançamento de entrada</b>. '+
+      'Por isso aparece como esgotada e não sai em Movimentos. '+
+      'Use <b>Ajustes &rarr; Revisar estoque</b> para corrigir ou apagar.</div>' : '';
+
+  document.getElementById('s-titulo').textContent=p.nome;
+  document.getElementById('s-peca').textContent=ficha(p)+(p.lote?' · lote '+p.lote:'');
+  document.getElementById('s-corpo').innerHTML=alerta+
+    '<div class="resumo" style="margin-top:0">'+
+      '<div class="lin"><span>Custo</span><b>'+R$(c.aquis)+'</b></div>'+
+      '<div class="lin"><span>Preço de venda</span><b>'+R$(c.preco)+'</b></div>'+
+      '<div class="lin tot"><span>Em estoque agora</span><b>'+q+'</b></div>'+
+    '</div>'+
+    '<div class="sec" style="margin-top:4px"><h2>Histórico</h2></div>'+
+    (L.length?'<div class="resumo" style="margin-top:0">'+linhas+
+      '<div class="lin tot"><span>Entraram '+entrou+' · saíram '+saiu+'</span><b>'+q+' em estoque</b></div></div>'
+      :'<div class="vazio" style="padding:22px"><div class="em">&#8645;</div>Nenhum lançamento para esta peça.</div>')+
+    (q>0?'<button class="btn pri full" style="margin-top:6px" onclick="abrirSaida(\''+pid+'\',\'SAÍDA\')">Vender</button>':'')+
+    '<button class="btn full" style="margin-top:9px" onclick="editarPeca(\''+pid+'\')">Editar peça</button>';
+  document.getElementById('ov-saida').classList.add('on');
+}
+
 function renderEstoque(){
   const cats=['Todas'].concat([...new Set(S.pecas.map(p=>p.cat))].sort());
   document.getElementById('chips-cat').innerHTML=cats.map(c=>
@@ -929,19 +1070,23 @@ function renderEstoque(){
   const lista=S.pecas.filter(p=>{
     if(filtroCat!=='Todas'&&p.cat!==filtroCat)return false;
     if(!q)return true;
-    return (p.nome+' '+p.cod+' '+p.cor+' '+p.cat+' '+p.tam).toLowerCase().includes(q);
+    const alvo=(p.nome+' '+p.cod+' '+p.cor+' '+p.cat+' '+p.tam+' '+(p.lote||'')).toLowerCase();
+    return alvo.includes(q)||chaveNome(p.nome).indexOf(chaveNome(q))>=0;
   }).sort((a,b)=>(estoqueDe(b.id)>0)-(estoqueDe(a.id)>0)||a.nome.localeCompare(b.nome));
 
   const el=document.getElementById('lista-estoque');
   if(!lista.length){el.innerHTML='<div class="vazio"><div class="em">&#9636;</div>Nenhuma peça encontrada.</div>';return;}
   el.innerHTML=lista.map(p=>{
     const c=calc(p), q=estoqueDe(p.id);
-    const b=q<=0?'<span class="badge b-esg">ESGOTADO</span>':(q===1?'<span class="badge b-ult">ÚLTIMA</span>':'<span class="badge b-ok">'+q+' EM ESTOQUE</span>');
+    const orfa=semEntrada(p.id);
+    const b=orfa?'<span class="badge b-ult">SEM LANÇAMENTO DE ENTRADA</span>'
+      :(q<=0?'<span class="badge b-esg">ESGOTADO</span>'
+      :(q===1?'<span class="badge b-ult">ÚLTIMA</span>':'<span class="badge b-ok">'+q+' EM ESTOQUE</span>'));
     return `<div class="item ${q<=0?'esgotado':''}">
       <div class="item-top">
         <div class="item-nome">
           <b>${esc(p.nome)}</b>
-          <div class="item-meta">${esc(p.tam)} · ${esc(p.cor||'—')} · cód. ${esc(p.cod)} ${p.lote?'· lote '+esc(p.lote):''}</div>
+          <div class="item-meta">${esc(ficha(p))}${p.lote?' · lote '+esc(p.lote):''}</div>
           <div style="margin-top:6px">${b}</div>
         </div>
         <div class="item-preco">
@@ -953,8 +1098,11 @@ function renderEstoque(){
       ${q>0?`<div class="item-acoes">
         <button class="btn pri sm" onclick="abrirSaida('${p.id}','SAÍDA')">Vender</button>
         <button class="btn sm" onclick="abrirSaida('${p.id}','PERMUTA')">Divulgação</button>
+        <button class="btn sm gho" onclick="historicoPeca('${p.id}')" title="Histórico da peça">&#8645;</button>
         <button class="btn sm gho" onclick="abrirSaida('${p.id}','MAIS')">&#8943;</button>
-      </div>`:`<div class="item-acoes"><button class="btn sm gho" onclick="abrirSaida('${p.id}','MAIS')">Opções</button></div>`}
+      </div>`:`<div class="item-acoes">
+        <button class="btn sm" onclick="historicoPeca('${p.id}')">Para onde foi</button>
+        <button class="btn sm gho" onclick="abrirSaida('${p.id}','MAIS')">Opções</button></div>`}
     </div>`;
   }).join('');
 }
@@ -963,7 +1111,7 @@ function renderEstoque(){
 function abrirSaida(pid,tipo){
   const p=peca(pid); if(!p)return;
   const c=calc(p);
-  ctxSaida={pid:pid,tipo:tipo,preco:(tipo==='SÓCIO'?c.aquis:c.preco),pgto:'Pix',parc:1,qtd:1,socio:'Samuel',incEmb:false,data:hoje()};
+  ctxSaida={pid:pid,tipo:tipo,preco:(tipo==='SÓCIO'?c.aquis:c.preco),pgto:'Pix',parc:1,qtd:1,socio:'Samuel',incEmb:false,data:hoje(),absorve:!!S.cfg.absorveTaxa};
   document.getElementById('s-peca').textContent=p.nome+' · '+p.tam+' · '+(p.cor||'');
   document.getElementById('ov-saida').classList.add('on');
   desenharSaida();
@@ -1047,9 +1195,11 @@ function desenharSaida(){
 
   /* ---- VENDA ---- */
   const preco=x.preco;
-  const cart=x.pgto==='Cartão'?noCartao(preco,x.parc):{taxa:0,total:preco,parcela:preco,acrescimo:0};
+  const cart=x.pgto==='Cartão'?noCartao(preco,x.parc,x.absorve)
+                              :{taxa:0,total:preco,parcela:preco,acrescimo:0,liquido:preco,custoTaxa:0};
   const acre=cart.acrescimo, recebido=cart.total, parcela=cart.parcela;
-  const lucro=lucroDe(preco,c.total);
+  const liquido=cart.liquido, custoTaxa=cart.custoTaxa;
+  const lucro=lucroDe(liquido,c.total);
   const sam=lucro*((+S.cfg.splitSam||0)/100), cun=lucro*((+S.cfg.splitCun||0)/100);
   const maxp=+S.cfg.maxParc||3;
   const dif=preco-c.sugerido;
@@ -1058,11 +1208,21 @@ function desenharSaida(){
   if(x.pgto==='Cartão'){
     let bts='';
     for(let n=1;n<=maxp;n++){
-      const o=noCartao(preco,n);
+      const o=noCartao(preco,n,x.absorve);
       bts+=`<button class="${x.parc===n?'on':''}" onclick="ctxSaida.parc=${n};desenharSaida()">
               ${n}x de<b>${R$(o.parcela)}</b><span style="font-size:10px">${R$(o.total)}</span></button>`;
     }
     parcelasHTML=`
+      <div class="f">
+        <label>Quem paga a taxa da maquininha</label>
+        <div class="seg" style="grid-template-columns:1fr 1fr">
+          <button class="${!x.absorve?'on':''}" onclick="ctxSaida.absorve=false;desenharSaida()">O cliente</button>
+          <button class="${x.absorve?'on':''}" onclick="ctxSaida.absorve=true;desenharSaida()">Eu absorvo</button>
+        </div>
+        <div class="dica">${x.absorve
+          ? 'O cliente paga o preço de tabela e a taxa sai do seu lucro.'
+          : 'A taxa é somada ao valor do cliente e você recebe o preço cheio.'}</div>
+      </div>
       <div class="f"><label>Parcelas — quanto o cliente paga</label><div class="parc">${bts}</div></div>
       <div class="f">
         <label>Taxa do Mercado Pago em ${x.parc}x (%)</label>
@@ -1093,9 +1253,11 @@ function desenharSaida(){
     ${parcelasHTML}
 
     <div class="resumo">
-      <div class="lin"><span>Você recebe (preço da peça)</span><b>${R$(preco)}</b></div>
-      ${acre>0?`<div class="lin"><span>Taxa do cartão em ${x.parc}x (${cart.taxa}%)</span><b>${R$(acre)}</b></div>`:''}
+      <div class="lin"><span>Preço da peça</span><b>${R$(preco)}</b></div>
+      ${acre>0?`<div class="lin"><span>Taxa do cartão em ${x.parc}x (${cart.taxa}%)</span><b>+ ${R$(acre)}</b></div>`:''}
       <div class="lin tot"><span>${x.pgto==='Cartão'?'Cliente paga '+x.parc+'x de '+R$(parcela)+' =':'Cliente paga'}</span><b>${R$(recebido)}</b></div>
+      ${custoTaxa>0?`<div class="lin"><span>Taxa que você absorve (${cart.taxa}%)</span><b class="v-verm">− ${R$(custoTaxa)}</b></div>
+      <div class="lin"><span>Você recebe</span><b>${R$(liquido)}</b></div>`:''}
       <div class="lin" style="margin-top:8px"><span>Custo da peça</span><b>− ${R$(c.aquis)}</b></div>
       ${c.mat>0?`<div class="lin"><span>Embalagem</span><b>− ${R$(c.mat)}</b></div>`:''}
       <div class="lin"><span>Provisão perda/imposto</span><b>− ${R$(preco*(((+S.cfg.perda||0)+(+S.cfg.imposto||0))/100))}</b></div>
@@ -1137,6 +1299,7 @@ function confirmarSaida(){
     valor:valor, pgto:x.tipo==='SAÍDA'?x.pgto:'—',
     taxa:(x.tipo==='SAÍDA'&&x.pgto==='Cartão')?taxaParc(x.parc):0,
     parc:(x.tipo==='SAÍDA'&&x.pgto==='Cartão')?x.parc:1,
+    absorve:(x.tipo==='SAÍDA'&&x.pgto==='Cartão')?!!x.absorve:undefined,
     socio:x.tipo==='SÓCIO'?(x.socio||'Samuel'):undefined,
     incEmb:x.tipo==='SÓCIO'?!!x.incEmb:undefined,
     cliente:x.tipo==='SÓCIO'?(x.socio||'Samuel'):gv('s-cliente'),
@@ -1398,7 +1561,10 @@ function salvarPeca(){
   S.pecas.push(Object.assign({id:id,criado:hoje()},dados));
   S.movs.push({id:'m'+Date.now(),data:hoje(),tipo:'ENTRADA',pecaId:id,qtd:qtd,valor:custo,
                pgto:'—',taxa:0,parc:1,cliente:'',origem:'—',obs:dados.lote?'Lote '+dados.lote:'Cadastro'});
+  const al=manual===''?alinharPreco(dados.nome):null;
   salvar(); toast(qtd+' peça(s) no estoque'); limparCadastro(); ir('estoque');
+  if(al)toast('Já existe "'+dados.nome+'" no catálogo · preço alinhado em '+R$(al.preco)+
+              ' ('+al.ajustadas+' peça(s) ajustada(s))');
 }
 function limparCadastro(){
   ['n-nome','n-cod','n-cor','n-custo','n-preco','n-lote'].forEach(i=>document.getElementById(i).value='');
@@ -1429,12 +1595,15 @@ function renderMovs(){
     else if(m.tipo==='SÓCIO'){val='+ '+R$(m.valor);cls='v-verde';}
     else {val='− '+R$(m.valor);cls='v-verm';}
     const det=[dataBR(m.data)];
-    if(m.tipo==='SAÍDA')det.push(m.pgto+(m.pgto==='Cartão'?' '+m.parc+'x ('+m.taxa+'%)':''));
+    if(p)det.push(ficha(p));                 /* tamanho · cor · código */
+    if(m.qtd>1)det.push(m.qtd+' un');
+    if(m.tipo==='SAÍDA')det.push(m.pgto+(m.pgto==='Cartão'?' '+m.parc+'x ('+m.taxa+'%'+
+      (m.absorve?', absorvida · líquido '+R$(liquidoMov(m)):'')+')':''));
     if(m.tipo==='SÓCIO')det.push('custo reposto'+(m.incEmb?' com embalagem':'')+' · sem lucro');
     if(m.cliente)det.push(m.cliente);
     if(m.obs)det.push(m.obs);
     L.push({tipo:m.tipo,data:m.data,id:m.id,titulo:p?p.nome:'peça removida',
-            sub:det.join(' · '),val:val,cls:cls,del:"apagarMov('"+m.id+"')"});
+            pid:p?p.id:'',sub:det.join(' · '),val:val,cls:cls,del:"apagarMov('"+m.id+"')"});
   });
   (S.materiais||[]).forEach(m=>L.push({tipo:'MATERIAL',data:m.data,id:m.id,
     titulo:m.tipo+' · '+m.qtd+' un',
@@ -1455,7 +1624,8 @@ function renderMovs(){
   if(!L.length){el.innerHTML='<div class="vazio"><div class="em">&#8645;</div>Nada registrado aqui ainda.</div>';return;}
   el.innerHTML=L.map(x=>`<div class="mov">
       <div class="mov-ic ${ic[x.tipo][1]}">${ic[x.tipo][0]}</div>
-      <div class="mov-c"><b>${esc(x.titulo)}</b><small>${esc(x.sub)}</small></div>
+      <div class="mov-c"><b>${esc(x.titulo)}</b><small>${esc(x.sub)}</small>
+        ${x.pid?`<button class="btn gho" style="padding:1px 7px;font-size:10.5px;margin-top:5px" onclick="historicoPeca('${x.pid}')">ver a peça</button>`:''}</div>
       <div class="mov-v ${x.cls}">${x.val}<br><button class="btn gho" style="padding:2px 7px;font-size:11px;margin-top:4px" onclick="${x.del};renderMovs()">excluir</button></div>
     </div>`).join('');
 }
@@ -1473,8 +1643,11 @@ function renderConfig(){
   set('c-permmin',c.permMin);
   set('c-gdid',c.gdClientId||''); set('c-gdfile',c.gdArquivo||'sahga-backup.json');
   document.getElementById('c-gdauto').checked=!!c.gdAuto;
+  document.getElementById('c-alinhar').checked=c.alinharPreco!==false;
+  document.getElementById('c-absorve').checked=!!c.absorveTaxa;
   gdStatus();
   renderMatResumo();
+  renderRevisao();
   const ex=T_EXEMPLO();
   document.getElementById('c-taxas').innerHTML=Object.keys(c.taxasCartao)
     .map(Number).sort((a,b)=>a-b).filter(n=>n<=(+c.maxParc||3)).map(n=>{
@@ -1503,11 +1676,14 @@ function salvarConfig(){
   const g=id=>num(id);
   S.cfg.arred=g('c-arred')||10; S.cfg.term=g('c-term'); S.cfg.perda=g('c-perda'); S.cfg.imposto=g('c-imposto');
   S.cfg.maxParc=parseInt(document.getElementById('c-maxparc').value)||3;
+  S.cfg.alinharPreco=document.getElementById('c-alinhar').checked;
+  S.cfg.absorveTaxa=document.getElementById('c-absorve').checked;
   S.cfg.splitSam=g('c-sam'); S.cfg.splitCun=g('c-cun'); S.cfg.permMin=g('c-permmin');
   S.cfg.gdClientId=document.getElementById('c-gdid').value.trim();
   S.cfg.gdArquivo=document.getElementById('c-gdfile').value.trim()||'sahga-backup.json';
   S.cfg.gdAuto=document.getElementById('c-gdauto').checked;
   renderMatResumo();
+  renderRevisao();
   salvar(); gdStatus();
 }
 
@@ -1524,16 +1700,16 @@ function exportar(){
   toast('Backup baixado');
 }
 function exportarCSV(){
-  const h=['Data','Tipo','Codigo','Produto','Tam','Qtde','PrecoRecebido','Pagamento','Taxa%','Parcelas','ClientePagou','Custo','Lucro','Samuel','Sara','Cliente','Origem','Obs'];
+  const h=['Data','Tipo','Codigo','Produto','Tam','Cor','Qtde','PrecoVenda','Pagamento','Taxa%','Parcelas','TaxaQuemPaga','Liquido','ClientePagou','Custo','Lucro','Samuel','Sara','Cliente','Origem','Obs'];
   const lin=S.movs.slice().sort((a,b)=>a.data.localeCompare(b.data)).map(m=>{
     const p=peca(m.pecaId); const c=p?calc(p):{total:0,aquis:0};
     let lucro=0;
-    if(m.tipo==='SAÍDA')lucro=lucroDe(m.valor,c.total)*m.qtd;
+    if(m.tipo==='SAÍDA')lucro=lucroDe(liquidoMov(m),c.total)*m.qtd;
     else if(m.tipo==='DEVOLUÇÃO')lucro=-lucroDe(m.valor,c.total)*m.qtd;
     else if(m.tipo==='PERMUTA')lucro=-c.total*m.qtd;
     else if(m.tipo==='PERDA')lucro=-c.aquis*m.qtd;
-    const rec=m.tipo==='SAÍDA'?(m.taxa?m.valor/(1-m.taxa/100):m.valor)*m.qtd:0;
-    return [m.data,m.tipo,p?p.cod:'',p?p.nome:'',p?p.tam:'',m.qtd,m.valor.toFixed(2),m.pgto,m.taxa||0,m.parc||1,
+    const rec=m.tipo==='SAÍDA'?(m.absorve?m.valor:(m.taxa?m.valor/(1-m.taxa/100):m.valor))*m.qtd:0;
+    return [m.data,m.tipo,p?p.cod:'',p?p.nome:'',p?p.tam:'',p?(p.cor||''):'',m.qtd,m.valor.toFixed(2),m.pgto,m.taxa||0,m.parc||1,(m.absorve?'absorvida':'repassada'),liquidoMov(m).toFixed(2),
             rec.toFixed(2),c.total.toFixed(2),lucro.toFixed(2),
             (lucro*S.cfg.splitSam/100).toFixed(2),(lucro*S.cfg.splitCun/100).toFixed(2),
             m.cliente||'',m.origem||'',(m.obs||'').replace(/;/g,',')];
@@ -1649,8 +1825,16 @@ function aplicarLote(d){
       forn:String(m.forn||'').trim()});
   });
 
+  /* peças iguais às que já existem assumem o preço de catálogo mais alto */
+  const nomes={}; itens.forEach(x=>{nomes[chaveNome(x.nome)]=x.nome;});
+  const alinhadas=[];
+  Object.keys(nomes).forEach(k=>{ const a=alinharPreco(nomes[k]); if(a)alinhadas.push(nomes[k]+' → '+R$(a.preco)); });
+
   salvar(); ir('estoque');
   toast(totalPecas+' peça(s) importada(s)'+(pedido?' · pedido '+pedido:''));
+  if(alinhadas.length)setTimeout(()=>alert('Preço de catálogo aplicado\n\n'+
+    'Estas peças já existiam no estoque e todas ficaram com o preço mais alto:\n\n'+
+    alinhadas.join('\n')+'\n\nPra mudar, edite o preço da peça no estoque.'),400);
 }
 
 /* desfaz um lote inteiro pelo numero do pedido — para corrigir importacao errada */
@@ -1684,6 +1868,119 @@ function desfazerLote(){
   S.movs =S.movs.filter(m=>limpas.indexOf(m.pecaId)<0);
   salvar(); ir('estoque');
   toast(limpas.length+' peça(s) do pedido '+alvo+' apagada(s)');
+}
+
+/* =====================================================================
+   REVISAR ESTOQUE — acha peça sem entrada e nomes diferentes para
+   o mesmo produto, e corrige.
+   ===================================================================== */
+function gruposDeNome(){
+  const nomes=[...new Set(S.pecas.map(p=>p.nome).filter(Boolean))];
+  const usados={}, grupos=[];
+  nomes.forEach(n=>{
+    if(usados[n])return;
+    const bloco=nomes.filter(o=>!usados[o]&&mesmoProduto(n,o));
+    if(bloco.length<2)return;                    /* escrito de um jeito só: tudo certo */
+    bloco.forEach(o=>usados[o]=1);
+    grupos.push({nomes:bloco, pecas:S.pecas.filter(p=>bloco.indexOf(p.nome)>=0)});
+  });
+  return grupos;
+}
+
+function renderRevisao(){
+  const el=document.getElementById('rev-corpo'); if(!el)return;
+  const orfas=S.pecas.filter(p=>semEntrada(p.id));
+  const grupos=gruposDeNome();
+  let h='';
+
+  if(!orfas.length&&!grupos.length){
+    el.innerHTML='<div class="lin"><span>Nenhum problema encontrado</span>'+
+      '<b class="v-verde">'+S.pecas.length+' peças</b></div>';
+    return;
+  }
+
+  if(grupos.length){
+    h+='<div class="sec" style="margin-top:0"><h2>Mesmo produto, nomes diferentes</h2></div>';
+    grupos.forEach((g,i)=>{
+      const cont=g.nomes.map(n=>{
+        const qtd=g.pecas.filter(p=>p.nome===n).length;
+        return '<div class="lin"><span>'+esc(n)+'</span><b>'+qtd+' peça(s)</b></div>';
+      }).join('');
+      /* sugere o nome mais completo, que costuma ser o certo */
+      const sugerido=g.nomes.slice().sort((a,b)=>b.length-a.length)[0];
+      h+='<div class="resumo" style="margin-top:0;margin-bottom:11px">'+cont+
+         '<div class="lin tot"><span>Unificar como</span><b>'+esc(sugerido)+'</b></div>'+
+         '<button class="btn full" style="margin-top:9px" onclick="unificarNome('+i+')">Usar este nome em todas</button>'+
+         '</div>';
+    });
+    window.__GRUPOS=grupos;
+  }
+
+  if(orfas.length){
+    h+='<div class="sec"><h2>Peças sem lançamento de entrada</h2></div>'+
+       '<div class="aviso" style="margin-top:0">Estas peças estão cadastradas mas nunca entraram no estoque. '+
+       'Aparecem como esgotadas e não saem em Movimentos. Crie a entrada se a peça existe de verdade, '+
+       'ou apague se foi cadastro errado.</div>';
+    orfas.forEach(p=>{
+      h+='<div class="resumo" style="margin-top:0;margin-bottom:11px">'+
+        '<div class="lin"><span><b style="color:var(--texto)">'+esc(p.nome)+'</b><br>'+
+          '<small style="font-size:11px">'+esc(ficha(p))+(p.lote?' · lote '+esc(p.lote):'')+'</small></span>'+
+          '<b>'+R$(p.custo)+'</b></div>'+
+        '<div style="display:flex;gap:8px;margin-top:9px">'+
+          '<button class="btn sm" onclick="criarEntrada(\''+p.id+'\')">Criar entrada</button>'+
+          '<button class="btn sm gho" onclick="historicoPeca(\''+p.id+'\')">Ver</button>'+
+          '<button class="btn sm dan" onclick="apagarPeca(\''+p.id+'\')">Apagar</button>'+
+        '</div></div>';
+    });
+  }
+  el.innerHTML=h;
+}
+
+function unificarNome(i){
+  const g=(window.__GRUPOS||[])[i]; if(!g)return;
+  const nome=g.nomes.slice().sort((a,b)=>b.length-a.length)[0];
+  const escolha=prompt('Nome que todas as '+g.pecas.length+' peças vão usar:',nome);
+  if(escolha===null)return;
+  const n=String(escolha).trim(); if(!n){toast('Nome vazio');return;}
+  g.pecas.forEach(p=>{p.nome=n;});
+  salvar(); renderRevisao(); renderEstoque(); renderMovs();
+  toast(g.pecas.length+' peça(s) agora se chamam "'+n+'"');
+}
+
+function criarEntrada(pid){
+  const p=peca(pid); if(!p)return;
+  const d=prompt('Data da entrada desta peça (AAAA-MM-DD):',p.criado||hoje());
+  if(d===null)return;
+  const data=/^\d{4}-\d{2}-\d{2}$/.test(String(d).trim())?String(d).trim():(p.criado||hoje());
+  const q=Math.max(1,parseInt(prompt('Quantas unidades entraram?','1'))||1);
+  S.movs.push({id:'m'+Date.now(),data:data,tipo:'ENTRADA',pecaId:pid,qtd:q,valor:+p.custo||0,
+    pgto:'—',taxa:0,parc:1,cliente:'',origem:'—',obs:p.lote?'Pedido '+p.lote:'Entrada corrigida'});
+  salvar(); renderRevisao(); renderEstoque(); renderPainel();
+  toast(q+' un de "'+p.nome+'" lançada(s) em '+dataBR(data));
+}
+
+function apagarPeca(pid){
+  const p=peca(pid); if(!p)return;
+  const L=movsDaPeca(pid);
+  if(L.length&&!confirm('Esta peça tem '+L.length+' lançamento(s). Apagar a peça apaga todos. Continuar?'))return;
+  if(!L.length&&!confirm('Apagar "'+p.nome+'" ('+ficha(p)+')?'))return;
+  S.pecas=S.pecas.filter(x=>x.id!==pid);
+  S.movs=S.movs.filter(m=>m.pecaId!==pid);
+  salvar(); fechar('ov-saida'); renderRevisao(); renderEstoque(); renderPainel();
+  toast('Peça apagada');
+}
+
+/* passa o catálogo inteiro: útil depois de ligar a opção ou importar lotes antigos */
+function alinharTudo(){
+  if(!S.cfg.alinharPreco){ toast('Ligue a opção acima primeiro'); return; }
+  const vistos={}, mudou=[];
+  S.pecas.forEach(p=>{
+    const k=chaveNome(p.nome); if(!k||vistos[k])return; vistos[k]=1;
+    const a=alinharPreco(p.nome); if(a)mudou.push(p.nome+' → '+R$(a.preco)+' ('+a.ajustadas+')');
+  });
+  if(!mudou.length){ toast('Tudo já está alinhado'); return; }
+  salvar(); renderEstoque(); renderPainel();
+  alert('Preços alinhados\n\n'+mudou.join('\n'));
 }
 
 function zerar(){
